@@ -22,11 +22,11 @@ We highly recommend you to use our conda environment.
 ```bash
 # create virtual environment
 cd fMRIFound
-conda create -n fmrifound python=3.9
+conda create -n fmrifound python=3.10
 conda activate fmrifound
 
 # install dependencies
-pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
+pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 conda install ninja
 pip install tensorboard tensorboardX tqdm ipdb nvitop monai==1.3.0
 
