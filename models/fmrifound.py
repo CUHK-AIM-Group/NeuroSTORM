@@ -5,7 +5,7 @@ https://github.com/Transconnectome/SwiFT/blob/main/project/module/models/swin4d_
 """
 
 import itertools
-from typing import Optional, Sequence, Tuple, Type, Union
+from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
 import torch
@@ -34,7 +34,8 @@ __all__ = [
     "PatchMergingV2",
     "MERGING_MODE",
     "BasicLayer",
-    "SwinTransformer4D",
+    "fMRIFound",
+    "fMRIFoundMAE",
 ]
 
 

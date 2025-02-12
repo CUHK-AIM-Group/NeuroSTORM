@@ -60,14 +60,16 @@ Our directory structure looks like this:
 │   ├── heads                          <- task heads
 │   │   ├── cls_head.py                <- for classification tasks
 │   │   ├── reg_head.py                <- for regression tasks
-│   ├── fmrifound.py                   <- code of fMRIFound
+│   │   └── swift.py                   <- for contrastive learning
+│   ├── load_model.py                  <- load any backbone or head network
+│   ├── fmrifound.py                   <- fMRIFound
 │   ├── lightning_model.py             <- the basic lightning model class
-│   └── swift.py                       <- code of SwiFT
+│   └── swift.py                       <- SwiFT
 │
 ├── pretrained_models                  <- pre-trained model checkpoints 
 ├── scripts                 
-│   ├── abcd_pt                        <- scripts for pre-training in ABCD
-│   ├── adhd200_ft                     <- scripts for fine-tuning in ADHD200
+│   ├── abcd_pretrain                  <- scripts for pre-training in ABCD
+│   ├── adhd200_downstream             <- scripts for fine-tuning in ADHD200
 │   ├── ... 
 │   └── custom                         <- customize the run script, specify the dataset, model name, model parameters, task type, and head net
 │ 
@@ -75,6 +77,7 @@ Our directory structure looks like this:
 │
 ├── .gitignore                         <- list of files/folders ignored by git
 ├── main.py                            <- the program entry for the fMRI analysis platform
+├── set_envs.py                        <- set the environment variables
 └── README.md
 ```
 
@@ -91,9 +94,9 @@ Here is an example of pre-processing HCP-YA dataset:
 ```bash
 cd fMRIFound/datasets
 python preprocessing_volume.py --dataset_name hcp --load_root ./data/hcp --save_root ./processed_data/hcp --num_processes 32
- ```
+```
 
- We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. If you need to delete the original files to free up disk space, you can use `--delete_after_preprocess`, and the tool will delete the original data after processing each sequence. If you didn't delete them during runtime, you can run the tool again and use `--delete_nii`. The tool will check if preprocessed files exist in the output folder and then delete the original files.
+We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. If you need to delete the original files to free up disk space, you can use `--delete_after_preprocess`, and the tool will delete the original data after processing each sequence. If you didn't delete them during runtime, you can run the tool again and use `--delete_nii`. The tool will check if preprocessed files exist in the output folder and then delete the original files.
 
 
 ### 3.2 Convert 4D Volume to 2D ROIs data
@@ -105,12 +108,12 @@ cd fMRIFound/datasets
 python generate_roi_data_from_nii.py --atlas_names aal3 cc200 --dataset_names hcp ucla --output_dir ./processed_data --num_processes 32
  ```
 
- We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. We also provide code for computing the Functional Correlation Matrix. For details, refer to [BrainGNN](https://github.com/LifangHe/BrainGNN_Pytorch/tree/main). You can use it by:
+We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. We also provide code for computing the Functional Correlation Matrix. For details, refer to [BrainGNN](https://github.com/LifangHe/BrainGNN_Pytorch/tree/main). You can use it by:
 
 
  ```bash
 cd fMRIFound/datasets
-TBD
+# To be relased
  ```
 
 
@@ -122,7 +125,7 @@ You can use our prepared running scripts to quickly reproduce the experiments fr
 
 ```bash
 cd fMRIFound
-bash scripts/abcd_pt/pt_mae_fmrifound.sh
+bash scripts/hcp_downstream/ts_fmrifound_task2.sh
  ```
 
 
@@ -130,80 +133,44 @@ bash scripts/abcd_pt/pt_mae_fmrifound.sh
 Here is the arguments list of main.py
 
 ```
-usage: main.py [-h] [--seed SEED] [--dataset_name {S1200,ABCD,UKB,Dummy}]
-               [--downstream_task DOWNSTREAM_TASK]
-               [--downstream_task_type DOWNSTREAM_TASK_TYPE]
-               [--classifier_module CLASSIFIER_MODULE]
-               [--loggername LOGGERNAME] [--project_name PROJECT_NAME]
-               [--resume_ckpt_path RESUME_CKPT_PATH]
-               [--load_model_path LOAD_MODEL_PATH] [--test_only]
-               [--test_ckpt_path TEST_CKPT_PATH] [--freeze_feature_extractor]
-               [--grad_clip] [--optimizer OPTIMIZER] [--use_scheduler]
-               [--weight_decay WEIGHT_DECAY] [--learning_rate LEARNING_RATE]
-               [--momentum MOMENTUM] [--gamma GAMMA] [--cycle CYCLE]
-               [--milestones MILESTONES [MILESTONES ...]] [--adjust_thresh]
-               [--use_contrastive] [--contrastive_type CONTRASTIVE_TYPE]
-               [--pretraining] [--augment_during_training]
-               [--augment_only_affine] [--augment_only_intensity]
-               [--temperature TEMPERATURE] [--model MODEL]
-               [--in_chans IN_CHANS] [--embed_dim EMBED_DIM]
-               [--window_size WINDOW_SIZE [WINDOW_SIZE ...]]
-               [--first_window_size FIRST_WINDOW_SIZE [FIRST_WINDOW_SIZE ...]]
-               [--patch_size PATCH_SIZE [PATCH_SIZE ...]]
-               [--depths DEPTHS [DEPTHS ...]]
-               [--num_heads NUM_HEADS [NUM_HEADS ...]]
-               [--c_multiplier C_MULTIPLIER]
-               [--last_layer_full_MSA LAST_LAYER_FULL_MSA]
-               [--clf_head_version CLF_HEAD_VERSION]
-               [--attn_drop_rate ATTN_DROP_RATE] [--scalability_check]
-               [--process_code PROCESS_CODE]
-               [--dataset_split_num DATASET_SPLIT_NUM]
-               [--label_scaling_method {minmax,standardization}]
-               [--image_path IMAGE_PATH] [--bad_subj_path BAD_SUBJ_PATH]
-               [--input_type {rest,task}] [--train_split TRAIN_SPLIT]
-               [--val_split VAL_SPLIT] [--batch_size BATCH_SIZE]
-               [--eval_batch_size EVAL_BATCH_SIZE]
-               [--img_size IMG_SIZE [IMG_SIZE ...]]
-               [--sequence_length SEQUENCE_LENGTH]
-               [--stride_between_seq STRIDE_BETWEEN_SEQ]
-               [--stride_within_seq STRIDE_WITHIN_SEQ]
-               [--num_workers NUM_WORKERS] [--with_voxel_norm WITH_VOXEL_NORM]
-               [--shuffle_time_sequence]
+usage: main.py [-h] [--seed SEED] [--dataset_name {HCP1200,ABCD,UKB,Dummy,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}] [--downstream_task_id DOWNSTREAM_TASK_ID]
+               [--downstream_task_type DOWNSTREAM_TASK_TYPE] [--task_name TASK_NAME] [--loggername LOGGERNAME] [--project_name PROJECT_NAME] [--resume_ckpt_path RESUME_CKPT_PATH]
+               [--load_model_path LOAD_MODEL_PATH] [--test_only] [--test_ckpt_path TEST_CKPT_PATH] [--freeze_feature_extractor] [--print_flops] [--grad_clip] [--optimizer OPTIMIZER]
+               [--use_scheduler] [--weight_decay WEIGHT_DECAY] [--learning_rate LEARNING_RATE] [--momentum MOMENTUM] [--gamma GAMMA] [--cycle CYCLE] [--milestones MILESTONES [MILESTONES ...]]
+               [--adjust_thresh] [--use_contrastive] [--contrastive_type CONTRASTIVE_TYPE] [--use_mae] [--spatial_mask SPATIAL_MASK] [--time_mask TIME_MASK] [--mask_ratio MASK_RATIO]
+               [--pretraining] [--augment_during_training] [--augment_only_affine] [--augment_only_intensity] [--temperature TEMPERATURE] [--model MODEL] [--in_chans IN_CHANS]
+               [--num_classes NUM_CLASSES] [--embed_dim EMBED_DIM] [--window_size WINDOW_SIZE [WINDOW_SIZE ...]] [--first_window_size FIRST_WINDOW_SIZE [FIRST_WINDOW_SIZE ...]]
+               [--patch_size PATCH_SIZE [PATCH_SIZE ...]] [--depths DEPTHS [DEPTHS ...]] [--num_heads NUM_HEADS [NUM_HEADS ...]] [--c_multiplier C_MULTIPLIER]
+               [--last_layer_full_MSA LAST_LAYER_FULL_MSA] [--clf_head_version CLF_HEAD_VERSION] [--attn_drop_rate ATTN_DROP_RATE] [--scalability_check] [--process_code PROCESS_CODE]
+               [--dataset_split_num DATASET_SPLIT_NUM] [--label_scaling_method {minmax,standardization}] [--image_path IMAGE_PATH] [--bad_subj_path BAD_SUBJ_PATH] [--train_split TRAIN_SPLIT]
+               [--val_split VAL_SPLIT] [--batch_size BATCH_SIZE] [--eval_batch_size EVAL_BATCH_SIZE] [--img_size IMG_SIZE [IMG_SIZE ...]] [--sequence_length SEQUENCE_LENGTH]
+               [--stride_between_seq STRIDE_BETWEEN_SEQ] [--stride_within_seq STRIDE_WITHIN_SEQ] [--num_workers NUM_WORKERS] [--with_voxel_norm WITH_VOXEL_NORM] [--shuffle_time_sequence]
                [--limit_training_samples LIMIT_TRAINING_SAMPLES]
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  --seed SEED           random seeds. recommend aligning this argument with
-                        data split number to control randomness (default:
-                        1234)
-  --dataset_name {S1200,ABCD,UKB,Dummy}
-  --downstream_task DOWNSTREAM_TASK
-                        downstream task (default: sex)
+  --seed SEED           random seeds. recommend aligning this argument with data split number to control randomness (default: 1234)
+  --dataset_name {HCP1200,ABCD,UKB,Dummy,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}
+  --downstream_task_id DOWNSTREAM_TASK_ID
+                        downstream task id (default: 1)
   --downstream_task_type DOWNSTREAM_TASK_TYPE
-                        select either classification or regression according
-                        to your downstream task (default: default)
-  --classifier_module CLASSIFIER_MODULE
-                        A name of lightning classifier module (outdated
-                        argument) (default: default)
+                        select either classification or regression according to your downstream task (default: classification)
+  --task_name TASK_NAME
+                        specify the task name (default: sex)
   --loggername LOGGERNAME
                         A name of logger (default: default)
   --project_name PROJECT_NAME
-                        A name of project (Neptune) (default: default)
+                        A name of project (default: default)
   --resume_ckpt_path RESUME_CKPT_PATH
-                        A path to previous checkpoint. Use when you want to
-                        continue the training from the previous checkpoints
-                        (default: None)
+                        A path to previous checkpoint. Use when you want to continue the training from the previous checkpoints (default: None)
   --load_model_path LOAD_MODEL_PATH
-                        A path to the pre-trained model weight file (.pth)
-                        (default: None)
-  --test_only           specify when you want to test the checkpoints (model
-                        weights) (default: False)
+                        A path to the pre-trained model weight file (.pth) (default: None)
+  --test_only           specify when you want to test the checkpoints (model weights) (default: False)
   --test_ckpt_path TEST_CKPT_PATH
-                        A path to the previous checkpoint that intends to
-                        evaluate (--test_only should be True) (default: None)
+                        A path to the previous checkpoint that intends to evaluate (--test_only should be True) (default: None)
   --freeze_feature_extractor
-                        Whether to freeze the feature extractor (for
-                        evaluating the pre-trained weight) (default: False)
+                        Whether to freeze the feature extractor (for evaluating the pre-trained weight) (default: False)
+  --print_flops         Whether to print the number of FLOPs (default: False)
 
 Default classifier:
   --grad_clip           whether to use gradient clipping (default: False)
@@ -216,39 +183,37 @@ Default classifier:
                         learning rate for optimizer (default: 0.001)
   --momentum MOMENTUM   momentum for SGD (default: 0)
   --gamma GAMMA         decay for exponential LR scheduler (default: 1.0)
-  --cycle CYCLE         cycle size for CosineAnnealingWarmUpRestarts (default:
-                        0.3)
+  --cycle CYCLE         cycle size for CosineAnnealingWarmUpRestarts (default: 0.3)
   --milestones MILESTONES [MILESTONES ...]
                         lr scheduler (default: [100, 150])
-  --adjust_thresh       whether to adjust threshold for valid/test (default:
-                        False)
-  --use_contrastive     whether to use contrastive learning (specify
-                        --contrastive_type argument as well) (default: False)
+  --adjust_thresh       whether to adjust threshold for valid/test (default: False)
+  --use_contrastive     whether to use contrastive learning (specify --contrastive_type argument as well) (default: False)
   --contrastive_type CONTRASTIVE_TYPE
-                        combination of contrastive losses to use [1: Use the
-                        Instance contrastive loss function, 2: Use the local-
-                        local temporal contrastive loss function, 3: Use the
-                        sum of both loss functions] (default: 0)
+                        combination of contrastive losses to use [1: Use the Instance contrastive loss function, 2: Use the local-local temporal contrastive loss function, 3: Use the sum of
+                        both loss functions] (default: 0)
+  --use_mae             whether to use mae (default: False)
+  --spatial_mask SPATIAL_MASK
+                        spatial mae strategy (default: random)
+  --time_mask TIME_MASK
+                        time mae strategy (default: random)
+  --mask_ratio MASK_RATIO
+                        mae masking ratio (default: 0.1)
   --pretraining         whether to use pretraining (default: False)
   --augment_during_training
-                        whether to augment input images during training
-                        (default: False)
+                        whether to augment input images during training (default: False)
   --augment_only_affine
-                        whether to only apply affine augmentation (default:
-                        False)
+                        whether to only apply affine augmentation (default: False)
   --augment_only_intensity
-                        whether to only apply intensity augmentation (default:
-                        False)
+                        whether to only apply intensity augmentation (default: False)
   --temperature TEMPERATURE
                         temperature for NTXentLoss (default: 0.1)
   --model MODEL         which model to be used (default: none)
   --in_chans IN_CHANS   Channel size of input image (default: 1)
+  --num_classes NUM_CLASSES
   --embed_dim EMBED_DIM
-                        embedding size (recommend to use 24, 36, 48) (default:
-                        24)
+                        embedding size (recommend to use 24, 36, 48) (default: 24)
   --window_size WINDOW_SIZE [WINDOW_SIZE ...]
-                        window size from the second layers (default: [4, 4, 4,
-                        4])
+                        window size from the second layers (default: [4, 4, 4, 4])
   --first_window_size FIRST_WINDOW_SIZE [FIRST_WINDOW_SIZE ...]
                         first window size (default: [2, 2, 2, 2])
   --patch_size PATCH_SIZE [PATCH_SIZE ...]
@@ -256,57 +221,43 @@ Default classifier:
   --depths DEPTHS [DEPTHS ...]
                         depth of layers in each stage (default: [2, 2, 6, 2])
   --num_heads NUM_HEADS [NUM_HEADS ...]
-                        The number of heads for each attention layer (default:
-                        [3, 6, 12, 24])
+                        The number of heads for each attention layer (default: [3, 6, 12, 24])
   --c_multiplier C_MULTIPLIER
-                        channel multiplier for Swin Transformer architecture
-                        (default: 2)
+                        channel multiplier for Swin Transformer architecture (default: 2)
   --last_layer_full_MSA LAST_LAYER_FULL_MSA
-                        whether to use full-scale multi-head self-attention at
-                        the last layers (default: False)
+                        whether to use full-scale multi-head self-attention at the last layers (default: False)
   --clf_head_version CLF_HEAD_VERSION
                         clf head version, v2 has a hidden layer (default: v1)
   --attn_drop_rate ATTN_DROP_RATE
                         dropout rate of attention layers (default: 0)
   --scalability_check   whether to check scalability (default: False)
   --process_code PROCESS_CODE
-                        Slurm code/PBS code. Use this argument if you want to
-                        save process codes to your log (default: None)
+                        Slurm code/PBS code. Use this argument if you want to save process codes to your log (default: None)
 
 DataModule arguments:
   --dataset_split_num DATASET_SPLIT_NUM
-  --label_scaling_method {minmax, standardization}
-                        label normalization strategy for a regression task
-                        (mean and std are automatically calculated using train
-                        set) (default: standardization)
+  --label_scaling_method {minmax,standardization}
+                        label normalization strategy for a regression task (mean and std are automatically calculated using train set) (default: standardization)
   --image_path IMAGE_PATH
-                        path to image datasets preprocessed for SwiFT
-                        (default: None)
+                        path to image datasets preprocessed for SwiFT (default: None)
   --bad_subj_path BAD_SUBJ_PATH
-                        path to txt file that contains subjects with bad fMRI
-                        quality (default: None)
-  --input_type {rest,task}
-                        refer to datasets.py (default: rest)
+                        path to txt file that contains subjects with bad fMRI quality (default: None)
   --train_split TRAIN_SPLIT
   --val_split VAL_SPLIT
   --batch_size BATCH_SIZE
   --eval_batch_size EVAL_BATCH_SIZE
   --img_size IMG_SIZE [IMG_SIZE ...]
-                        image size (adjust the fourth dimension according to
-                        your --sequence_length argument) (default: [96, 96,
-                        96, 20])
+                        image size (adjust the fourth dimension according to your --sequence_length argument) (default: [96, 96, 96, 20])
   --sequence_length SEQUENCE_LENGTH
   --stride_between_seq STRIDE_BETWEEN_SEQ
-                        skip some fMRI volumes between fMRI sub-sequences
-                        (default: 1)
+                        skip some fMRI volumes between fMRI sub-sequences (default: 1)
   --stride_within_seq STRIDE_WITHIN_SEQ
-                        skip some fMRI volumes within fMRI sub-sequences
-                        (default: 1)
+                        skip some fMRI volumes within fMRI sub-sequences (default: 1)
   --num_workers NUM_WORKERS
   --with_voxel_norm WITH_VOXEL_NORM
   --shuffle_time_sequence
   --limit_training_samples LIMIT_TRAINING_SAMPLES
-                        use if you want to limit training samples (default:None)
+                        use if you want to limit training samples (default: None)
 ```
 
 
@@ -316,7 +267,7 @@ Unlike the pre-training scripts, different downstream tasks will have different 
 
 ```bash
 #!/bin/bash
-# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh score_name batch_size
+# bash scripts/hcp_ft/ts_abcd2hcp_mamba.sh score_name batch_size
 
 # Set default score_name
 score_name="MMSE_Score"
@@ -347,7 +298,6 @@ python project/main.py \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
-  --input_type rest \
   --project_name "$project_name" \
   --limit_training_samples 1.0 \
   --c_multiplier 2 \

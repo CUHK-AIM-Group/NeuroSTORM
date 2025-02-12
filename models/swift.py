@@ -31,7 +31,7 @@ __all__ = [
     "PatchMergingV2",
     "MERGING_MODE",
     "BasicLayer",
-    "SwinTransformer4D",
+    "SwiFT",
 ]
 
 
@@ -745,7 +745,6 @@ class SwiFT(nn.Module):
         c_multiplier: int = 2,
         last_layer_full_MSA: bool = False,
         downsample="mergingv2",
-        num_classes=2,
         **kwargs,
     ) -> None:
         """
@@ -795,11 +794,8 @@ class SwiFT(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
 
-        #patch_num = int((img_size[0]/patch_size[0]) * (img_size[1]/patch_size[1]) * (img_size[2]/patch_size[2]))
-        #time_num = int(img_size[3]/patch_size[3])
         patch_dim =  ((img_size[0]//patch_size[0]), (img_size[1]//patch_size[1]), (img_size[2]//patch_size[2]), (img_size[3]//patch_size[3]))
 
-        #print img, patch size, patch dim
         print("img_size: ", img_size)
         print("patch_size: ", patch_size)
         print("patch_dim: ", patch_dim)
@@ -867,10 +863,7 @@ class SwiFT(nn.Module):
                 use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
-
         else:
-            #################Full MSA for last layer#####################
-
             self.last_window_size = (
                 self.grid_size[0] // int(2 ** (self.num_layers - 1)),
                 self.grid_size[1] // int(2 ** (self.num_layers - 1)),
@@ -882,7 +875,6 @@ class SwiFT(nn.Module):
                 dim=int(embed_dim * c_multiplier ** (self.num_layers - 1)),
                 depth=depths[(self.num_layers - 1)],
                 num_heads=num_heads[(self.num_layers - 1)],
-                # change the window size to the entire grid size
                 window_size=self.last_window_size,
                 drop_path=dpr[sum(depths[: (self.num_layers - 1)]) : sum(depths[: (self.num_layers - 1) + 1])],
                 mlp_ratio=mlp_ratio,

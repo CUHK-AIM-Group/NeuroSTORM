@@ -220,9 +220,6 @@ class LightningModel(pl.LightningModule):
                 pred = pred_list[0]
                 mask = pred_list[1]
                 end_time_model = time.time()
-
-                if mode == 'valid' and loss.item() > 3:
-                    print(y[0, 0, 30, 30, 30])
                 
                 result_dict = {
                     f"{mode}_loss": loss
@@ -540,7 +537,7 @@ class LightningModel(pl.LightningModule):
             T_mult = 1
             
             sche = CosineAnnealingWarmUpRestarts(optim, first_cycle_steps=T_0, cycle_mult=T_mult, max_lr=base_lr,min_lr=1e-9, warmup_steps=warmup, gamma=gamma)
-            print('total iterations:',self.trainer.estimated_stepping_batches * self.hparams.max_epochs)
+            print('total iterations:', self.trainer.estimated_stepping_batches * self.hparams.max_epochs)
 
             scheduler = {
                 "scheduler": sche,

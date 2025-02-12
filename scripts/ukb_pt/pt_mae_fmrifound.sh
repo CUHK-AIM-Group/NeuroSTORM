@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash sample_scripts/ukb/pt_mae_fmrifound.sh score_name
+# bash scripts/ukb/pt_mae_fmrifound.sh score_name
 
 # Set default score_name
 mask_ratio="0.5"

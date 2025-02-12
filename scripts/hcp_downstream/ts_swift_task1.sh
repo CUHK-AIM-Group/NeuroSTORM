@@ -1,7 +1,7 @@
 #!/bin/bash
-# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh task_name batch_size
+# bash scripts/hcp_downstream/ts_swift_task1.sh task_name batch_size
 
-# Set default score_name
+# Set default task_name
 task_name="sex"
 batch_size="12"
 
@@ -9,37 +9,46 @@ batch_size="12"
 if [ ! -z "$1" ]; then
   task_name=$1
 fi
+
+if [ "$task_name" = "sex" ]; then
+    downstream_task_type="classification"
+else
+    downstream_task_type="regression"
+fi
+
 if [ ! -z "$2" ]; then
   batch_size=$2
 fi
 
-# export CUDA_VISIBLE_DEVICES=0,1
+# We will use all aviailable GPUs, and automatically set the same batch size for each GPU
+export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
-# Construct project_name using score_name
-project_name="hcp_ts_${task_name}_train1.0_swift"
+# Construct project_name using task_name
+project_name="hcp_ts_swift_task1_${task_name}_train1.0"
 
-python project/main.py \
+python main.py \
   --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
-  --clf_head_version v2 \
-  --dataset_name S1200 \
+  --clf_head_version v1 \
+  --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
-  --input_type rest \
   --project_name "$project_name" \
   --limit_training_samples 1.0 \
   --c_multiplier 2 \
   --last_layer_full_MSA True \
-  --downstream_task "$task_name" \
+  --downstream_task_id 1 \
+  --downstream_task_type "$downstream_task_type" \
+  --task_name "$task_name" \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \
-  --model swin4d_ver7 \
+  --model swift \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 20 \

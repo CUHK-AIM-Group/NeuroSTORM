@@ -1,9 +1,9 @@
 #!/bin/bash
-# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh score_name batch_size
+# bash scripts/hcp_downstream/ts_fmrifound_task2.sh score_name batch_size
 
 # Set default score_name
 score_name="MMSE_Score"
-batch_size="2"
+batch_size="12"
 
 # Override with the arguments if provided
 if [ ! -z "$1" ]; then
@@ -13,11 +13,12 @@ if [ ! -z "$2" ]; then
   batch_size=$2
 fi
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# We will use all aviailable GPUs, and automatically set the same batch size for each GPU
+export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using score_name
-project_name="hcp_ts_fmrifound_${score_name}_train1.0"
+project_name="hcp_ts_fmrifound_task2_${score_name}_train1.0"
 
 python main.py \
   --accelerator gpu \

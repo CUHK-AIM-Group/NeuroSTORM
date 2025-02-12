@@ -411,7 +411,6 @@ class fMRIDataModule(pl.LightningDataModule):
         return final_dict
 
     def setup(self, stage=None):
-        # this function will be called at each devices
         Dataset = self.get_dataset()
         params = {
                 "root": self.hparams.image_path,
@@ -425,7 +424,6 @@ class fMRIDataModule(pl.LightningDataModule):
                 "downstream_task_id": self.hparams.downstream_task_id,
                 "task_name": self.hparams.task_name,
                 "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
-                "input_type": self.hparams.input_type,
                 "label_scaling_method": self.hparams.label_scaling_method,
                 "dtype": 'float16'}
         
@@ -453,7 +451,6 @@ class fMRIDataModule(pl.LightningDataModule):
         test_dict = {key: subject_dict[key] for key in test_names if key in subject_dict}
         
         self.train_dataset = Dataset(**params, subject_dict=train_dict, use_augmentations=False, train=True)
-        # load train mean/std of target labels to val/test dataloader
         self.val_dataset = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False) 
         self.test_dataset = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
         
@@ -471,20 +468,18 @@ class fMRIDataModule(pl.LightningDataModule):
                 "num_workers": self.hparams.num_workers,
                 "drop_last": True,
                 "pin_memory": False,
-                "persistent_workers": False if self.hparams.dataset_name == 'Dummy' else (train and (self.hparams.strategy == 'ddp')),
+                "persistent_workers": (train and (self.hparams.strategy == 'ddp')),
                 "shuffle": train
             }
+        
         self.train_loader = DataLoader(self.train_dataset, **get_params(train=True))
         self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
         self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
-        
 
     def train_dataloader(self):
         return self.train_loader
 
     def val_dataloader(self):
-        # return self.val_loader
-        # currently returns validation and test set to track them during training
         return [self.val_loader, self.test_loader]
 
     def test_dataloader(self):
@@ -497,11 +492,10 @@ class fMRIDataModule(pl.LightningDataModule):
     def add_data_specific_args(cls, parent_parser: ArgumentParser, **kwargs) -> ArgumentParser:
         parser = ArgumentParser(parents=[parent_parser], add_help=True, formatter_class=ArgumentDefaultsHelpFormatter)
         group = parser.add_argument_group("DataModule arguments")
-        group.add_argument("--dataset_split_num", type=int, default=1) # dataset split, choose from 1, 2, or 3
+        group.add_argument("--dataset_split_num", type=int, default=1)
         group.add_argument("--label_scaling_method", default="standardization", choices=["minmax","standardization"], help="label normalization strategy for a regression task (mean and std are automatically calculated using train set)")
         group.add_argument("--image_path", default=None, help="path to image datasets preprocessed for SwiFT")
         group.add_argument("--bad_subj_path", default=None, help="path to txt file that contains subjects with bad fMRI quality")
-        group.add_argument("--input_type", default="rest",choices=['rest','task'],help='refer to datasets.py')
         group.add_argument("--train_split", default=0.7, type=float)
         group.add_argument("--val_split", default=0.15, type=float)
         group.add_argument("--batch_size", type=int, default=4)
@@ -514,4 +508,5 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")
+        
         return parser

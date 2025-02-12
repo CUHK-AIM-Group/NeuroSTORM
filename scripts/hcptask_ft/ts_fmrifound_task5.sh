@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh batch_size
+# bash scripts/hcp_ft/ts_abcd2hcp_mamba.sh batch_size
 
 batch_size="12"
 
@@ -24,7 +24,6 @@ python project/main.py \
   --image_path ./data/HCPTASK_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
-  --input_type rest \
   --project_name "$project_name" \
   --limit_training_samples 1.0 \
   --c_multiplier 2 \

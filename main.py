@@ -65,7 +65,13 @@ def cli_main():
     else:
         exp_id = None
     
-    setattr(args, "default_root_dir", f"output/{args.project_name}")
+    if args.model == "fmrifound":
+        category_dir = "fmrifound"
+    elif args.model in ["swift", "tff"]:
+        category_dir = "volume-based"
+    elif args.model in ["braingnn", "bnt"]:
+        category_dir = "roi-based"
+    setattr(args, "default_root_dir", f"output/{category_dir}/{args.project_name}")
 
     # ------------ data -------------
     data_module = Dataset(**vars(args))

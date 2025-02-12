@@ -19,7 +19,6 @@ def load_model(model_name, hparams=None):
                 num_heads=hparams.num_heads,
                 c_multiplier=hparams.c_multiplier,
                 last_layer_full_MSA=hparams.last_layer_full_MSA,
-                to_float=to_float,
                 drop_rate=hparams.attn_drop_rate,
                 drop_path_rate=hparams.attn_drop_rate,
                 attn_drop_rate=hparams.attn_drop_rate,
@@ -63,8 +62,8 @@ def load_model(model_name, hparams=None):
         from .heads.emb_head import emb_head
         net = emb_head(final_embedding_size=128, num_tokens = hparams.embed_dim * (hparams.c_multiplier ** (n_stages - 1)), use_normalization=True)
     elif model_name == "clf_mlp":
-        from .heads.cls_head import clf_head
-        net = clf_head(version=hparams.clf_head_version, num_classes=hparams.num_classes, num_tokens = hparams.embed_dim * (hparams.c_multiplier ** (n_stages - 1)))
+        from .heads.cls_head import cls_head
+        net = cls_head(version=hparams.clf_head_version, num_classes=hparams.num_classes, num_tokens = hparams.embed_dim * (hparams.c_multiplier ** (n_stages - 1)))
     elif model_name == "reg_mlp":
         from .heads.reg_head import reg_head
         net = reg_head(version=1, num_tokens = hparams.embed_dim * (hparams.c_multiplier ** (n_stages - 1)))
