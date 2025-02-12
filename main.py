@@ -19,7 +19,7 @@ def cli_main():
     # ------------ args -------------
     parser = ArgumentParser(add_help=False, formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("--seed", default=1234, type=int, help="random seeds. recommend aligning this argument with data split number to control randomness")
-    parser.add_argument("--dataset_name", type=str, choices=["HCP1200", "ABCD", "UKB", "Dummy", "Cobre", "ADHD200", "HCPA", "HCPD", "UCLA", "HCPEP", "HCPTASK", "GOD", "NSD", "BOLD5000"], default="HCP1200")
+    parser.add_argument("--dataset_name", type=str, choices=["HCP1200", "ABCD", "UKB", "Cobre", "ADHD200", "HCPA", "HCPD", "UCLA", "HCPEP", "HCPTASK", "GOD", "NSD", "BOLD5000"], default="HCP1200")
     parser.add_argument("--downstream_task_id", type=int, default="1", help="downstream task id")
     parser.add_argument("--downstream_task_type", type=str, default="classification", help="select either classification or regression according to your downstream task")
     parser.add_argument("--task_name", type=str, default="sex", help="specify the task name")

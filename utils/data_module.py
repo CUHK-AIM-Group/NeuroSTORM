@@ -135,7 +135,6 @@ class fMRIDataModule(pl.LightningDataModule):
     
     # filter subjects with metadata and pair subject names with their target values (+ sex)
     def make_subject_dict(self):
-        # output: {'subj1':[target1,target2],'subj2':[target1,target2]...}
         img_root = os.path.join(self.hparams.image_path, 'img')
         final_dict = dict()
 
@@ -143,7 +142,6 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = os.listdir(img_root)
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_gender.csv"))
             meta_data_residual = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_precise_age.csv"))
-            # meta_data_all = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_all.csv"))
             if self.hparams.task_name == 'sex': task_name = 'Gender'
             elif self.hparams.task_name == 'age': task_name = 'age'
             # MMSE_Score Social_Task_Random_Perc_TOM CogTotalComp_Unadj Emotion_Task_Acc Language_Task_Acc Strength_Unadj 
@@ -507,5 +505,5 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")
-        
+
         return parser

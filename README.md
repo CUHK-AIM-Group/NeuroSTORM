@@ -4,6 +4,18 @@
 
 </div>
 
+<div align="center">
+  <a href='LICENSE'><img src='https://img.shields.io/badge/license-MIT-yellow'></a>
+  <a href=''><img src='https://img.shields.io/badge/arXiv-fMRIFound-red'></a>  &nbsp;
+  <a href=''><img src='https://img.shields.io/badge/Project-fMRIFound-green'></a> &nbsp;
+  <a href=""><img src="https://img.shields.io/badge/GitHub-fMRIFound-9E95B7?logo=github"></a> &nbsp; 
+  <a href=''><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Model-fMRIFound-blue'></a> &nbsp; 
+  <br>
+</div>
+
+
+## Introduction
+
 This repo provides a platform that covers all aspects involved in using deep learning for fMRI analysis. It is moderately encapsulated, highly customizable, and supports most common tasks and methods out of the box. 
 
 This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. fMRIFound is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of fMRIFound in this repo. Specifically, our code provides the following:
@@ -15,6 +27,9 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 - Implementations of fMRIFound and other commonly used fMRI analysis models.
 - Customization options for all stages. You can quickly add custom preprocessing procedures, pre-training methods, fine-tuning strategies, new downstream tasks, and implement other models on the platform.
 
+
+## Updates
+* __[2025.02.13]__: Release the code of fMRIFound model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
 
 
 ## 1. How to install
@@ -133,7 +148,7 @@ bash scripts/hcp_downstream/ts_fmrifound_task2.sh
 Here is the arguments list of main.py
 
 ```
-usage: main.py [-h] [--seed SEED] [--dataset_name {HCP1200,ABCD,UKB,Dummy,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}] [--downstream_task_id DOWNSTREAM_TASK_ID]
+usage: main.py [-h] [--seed SEED] [--dataset_name {HCP1200,ABCD,UKB,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}] [--downstream_task_id DOWNSTREAM_TASK_ID]
                [--downstream_task_type DOWNSTREAM_TASK_TYPE] [--task_name TASK_NAME] [--loggername LOGGERNAME] [--project_name PROJECT_NAME] [--resume_ckpt_path RESUME_CKPT_PATH]
                [--load_model_path LOAD_MODEL_PATH] [--test_only] [--test_ckpt_path TEST_CKPT_PATH] [--freeze_feature_extractor] [--print_flops] [--grad_clip] [--optimizer OPTIMIZER]
                [--use_scheduler] [--weight_decay WEIGHT_DECAY] [--learning_rate LEARNING_RATE] [--momentum MOMENTUM] [--gamma GAMMA] [--cycle CYCLE] [--milestones MILESTONES [MILESTONES ...]]
@@ -150,7 +165,7 @@ usage: main.py [-h] [--seed SEED] [--dataset_name {HCP1200,ABCD,UKB,Dummy,Cobre,
 options:
   -h, --help            show this help message and exit
   --seed SEED           random seeds. recommend aligning this argument with data split number to control randomness (default: 1234)
-  --dataset_name {HCP1200,ABCD,UKB,Dummy,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}
+  --dataset_name {HCP1200,ABCD,UKB,Cobre,ADHD200,HCPA,HCPD,UCLA,HCPEP,HCPTASK,GOD,NSD,BOLD5000}
   --downstream_task_id DOWNSTREAM_TASK_ID
                         downstream task id (default: 1)
   --downstream_task_type DOWNSTREAM_TASK_TYPE
@@ -267,34 +282,42 @@ Unlike the pre-training scripts, different downstream tasks will have different 
 
 ```bash
 #!/bin/bash
-# bash scripts/hcp_ft/ts_abcd2hcp_mamba.sh score_name batch_size
+# bash scripts/hcp_downstream/ft_fmrifound_task1.sh task_name batch_size
 
-# Set default score_name
-score_name="MMSE_Score"
+# Set default task_name
+task_name="sex"
 batch_size="12"
 
 # Override with the arguments if provided
 if [ ! -z "$1" ]; then
-  score_name=$1
+  task_name=$1
 fi
+
+if [ "$task_name" = "sex" ]; then
+    downstream_task_type="classification"
+else
+    downstream_task_type="regression"
+fi
+
 if [ ! -z "$2" ]; then
   batch_size=$2
 fi
 
-# export CUDA_VISIBLE_DEVICES=0,1
+# We will use all aviailable GPUs, and automatically set the same batch size for each GPU
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export NCCL_P2P_DISABLE=1
 
-# Construct project_name using score_name
-project_name="hcp_ts_${score_name}_train1.0_fmrifound"
+# Construct project_name using task_name
+project_name="hcp_ts_fmrifound_task1_${task_name}_train1.0"
 
-python project/main.py \
+python main.py \
   --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
-  --clf_head_version v3 \
-  --dataset_name S1200 \
+  --clf_head_version v1 \
+  --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
@@ -302,8 +325,9 @@ python project/main.py \
   --limit_training_samples 1.0 \
   --c_multiplier 2 \
   --last_layer_full_MSA True \
-  --downstream_task int_total \
-  --score_name "$score_name" \
+  --downstream_task_id 1 \
+  --downstream_task_type "$downstream_task_type" \
+  --task_name "$task_name" \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \
@@ -311,12 +335,11 @@ python project/main.py \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 20 \
+  --img_size 96 96 96 20 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
-  --img_size 96 96 96 20 
+  --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt
  ```
-
- ### 4.4 fMRI retrieval scripts
 
 
 ## 5. How to ues your own dataset
@@ -401,47 +424,44 @@ Defining a new task involves setting labels in the dataset and choosing the head
 
 ```python
 def make_subject_dict(self):
-        img_root = os.path.join(self.hparams.image_path, 'img')
-        final_dict = dict()
+    img_root = os.path.join(self.hparams.image_path, 'img')
+    final_dict = dict()
 
-        if self.hparams.dataset_name == "your dataset":
-            subject_list = os.listdir(img_root)
-            meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "meta_data.csv"))
-            if self.hparams.downstream_task == 'xxx': task_name = 'xxx'
-            else: raise NotImplementedError()
+    if self.hparams.dataset_name == "your dataset":
+        subject_list = os.listdir(img_root)
+        meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "meta_data.csv"))
+        if self.hparams.task_name == 'xxx': task_name = 'xxx'
+        else: raise NotImplementedError()
 
-            print('task_name = {}'.format(task_name))
+        print('task_name = {}'.format(task_name))
 
-            if self.hparams.downstream_task == 'xxx':
-                meta_task = meta_data[['Subject',task_name]].dropna()
-            elif self.hparams.downstream_task == 'age':
-                meta_task = meta_data_residual[['subject', task_name, 'sex']].dropna()
-                meta_task = meta_task.rename(columns={'subject': 'Subject'})
-            
-            for subject in subject_list:
-                if int(subject) in meta_task['Subject'].values:
-                    if self.hparams.downstream_task == 'sex':
-                        target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
-                        target = 1 if target == "M" else 0
-                        sex = target
-                    elif self.hparams.downstream_task == 'age':
-                        target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
-                        sex = meta_task[meta_task["Subject"]==int(subject)]["sex"].values[0]
-                        sex = 1 if sex == "M" else 0
-                    elif self.hparams.downstream_task == 'xxx':
-                        target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
-                        sex = meta_task[meta_task["Subject"]==int(subject)]["Gender"].values[0]
-                        sex = 1 if sex == "M" else 0
-                    final_dict[subject] = [sex, target]
-            
-            print('Load dataset your dataset, {} subjects'.format(len(final_dict)))
+        if task_name == 'xxx':
+            meta_task = meta_data[['Subject',task_name]].dropna()
+        elif task_name == 'age':
+            meta_task = meta_data_residual[['subject', task_name, 'sex']].dropna()
+            meta_task = meta_task.rename(columns={'subject': 'Subject'})
+        
+        for subject in subject_list:
+            if int(subject) in meta_task['Subject'].values:
+                if task_name == 'sex':
+                    target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
+                    target = 1 if target == "M" else 0
+                    sex = target
+                elif task_name == 'age':
+                    target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
+                    sex = meta_task[meta_task["Subject"]==int(subject)]["sex"].values[0]
+                    sex = 1 if sex == "M" else 0
+                elif task_name == 'xxx':
+                    target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
+                    sex = meta_task[meta_task["Subject"]==int(subject)]["Gender"].values[0]
+                    sex = 1 if sex == "M" else 0
+                final_dict[subject] = [sex, target]
+        
+        print('Load dataset your dataset, {} subjects'.format(len(final_dict)))
 ```
 
 
-
 Then, specify the task type in the script by setting `--downstream_task`.
-
-
 
 
 Finally, choose either a classification or regression head. If you need a custom head, you can add a head net definition in the `models/heads` folder.
@@ -466,11 +486,7 @@ class cls_head(nn.Module):
 
 
 ## 7. Pretrained model checkpoints
-We provide some pretrained model checkpoints under the pretrained_models directory.
-
-## 8. TODO List
-
-- [x] Release code for fMRIFound.
+We have provided the checkpoint files on HuggingFace, and you can also use the HuggingFace API to load them directly in your code.
 
 
 ## Acknowledgements
@@ -479,9 +495,5 @@ Greatly appreciate the tremendous effort for the following projects!
 - https://github.com/Transconnectome/SwiFT
 - https://github.com/LifangHe/BrainGNN_Pytorch
 - https://github.com/MedARC-AI/MindEyeV2
+- https://fsl.fmrib.ox.ac.uk/fsl/docs
 
-
-### Citation   
-```
-TBD
-```   
