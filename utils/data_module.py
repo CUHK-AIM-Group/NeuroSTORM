@@ -182,12 +182,11 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "abcd-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'sex'
+            if self.hparams.task_name == 'sex': task_name = 'sex'
             elif self.hparams.downstream_task == 'age': task_name = 'age'
-            elif self.hparams.downstream_task == 'int_total': task_name = 'nihtbx_totalcomp_uncorrected'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subjectkey', task_name]].dropna()
             else:
                 meta_task = meta_data[['subjectkey', task_name, 'sex']].dropna()
@@ -207,12 +206,12 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "cobre-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'sex'
-            elif self.hparams.downstream_task == 'age': task_name = 'age'
-            elif self.hparams.downstream_task == 'diagnosis': task_name = 'dx'
+            if self.hparams.task_name == 'sex': task_name = 'sex'
+            elif self.hparams.task_name == 'age': task_name = 'age'
+            elif self.hparams.task_name == 'diagnosis': task_name = 'dx'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subject_id', task_name]].dropna()
             else:
                 meta_task = meta_data[['subject_id', task_name, 'sex']].dropna()
@@ -240,12 +239,12 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "adhd200-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'Gender'
-            elif self.hparams.downstream_task == 'age': task_name = 'Age'
-            elif self.hparams.downstream_task == 'diagnosis': task_name = 'DX'
+            if self.hparams.task_name == 'sex': task_name = 'Gender'
+            elif self.hparams.task_name == 'age': task_name = 'Age'
+            elif self.hparams.task_name == 'diagnosis': task_name = 'DX'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subject_id', task_name]].dropna()
             else:
                 meta_task = meta_data[['subject_id', task_name, 'Gender']].dropna()
@@ -269,12 +268,12 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "ucla-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'gender'
-            elif self.hparams.downstream_task == 'age': task_name = 'age'
-            elif self.hparams.downstream_task == 'diagnosis': task_name = 'diagnosis'
+            if self.hparams.task_name == 'sex': task_name = 'gender'
+            elif self.hparams.task_name == 'age': task_name = 'age'
+            elif self.hparams.task_name == 'diagnosis': task_name = 'diagnosis'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subject_id', task_name]].dropna()
             else:
                 meta_task = meta_data[['subject_id', task_name, 'gender']].dropna()
@@ -302,12 +301,12 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "hcpep-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'sex'
-            elif self.hparams.downstream_task == 'age': task_name = 'interview_age'
-            elif self.hparams.downstream_task == 'diagnosis': task_name = 'phenotype'
+            if self.hparams.task_name == 'sex': task_name = 'sex'
+            elif self.hparams.task_name == 'age': task_name = 'interview_age'
+            elif self.hparams.task_name == 'diagnosis': task_name = 'phenotype'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subject_id', task_name]].dropna()
             else:
                 meta_task = meta_data[['subject_id', task_name, 'sex']].dropna()
@@ -333,7 +332,7 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "god_label.csv"))
-            if self.hparams.downstream_task == 'classification': task_name = 'class'
+            if self.hparams.downstream_task_id == 4: task_name = 'class'
             else: raise ValueError('downstream task not supported')
            
             meta_task = meta_data[['subject_id', task_name]].dropna()
@@ -370,11 +369,11 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = [subj for subj in os.listdir(img_root)]
 
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "ukb-rest.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'sex'
-            elif self.hparams.downstream_task == 'age': task_name = 'age'
+            if self.hparams.task_name == 'sex': task_name = 'sex'
+            elif self.hparams.task_name == 'age': task_name = 'age'
             else: raise ValueError('downstream task not supported')
            
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'sex':
                 meta_task = meta_data[['subject_id', task_name]].dropna()
             else:
                 meta_task = meta_data[['subject_id', task_name, 'sex']].dropna()
@@ -394,7 +393,7 @@ class fMRIDataModule(pl.LightningDataModule):
         elif self.hparams.dataset_name == "HCPTASK":
             subject_list = [subj for subj in os.listdir(img_root)]
 
-            if self.hparams.downstream_task == 'classification': task_name = 'classification'
+            if self.hparams.downstream_task_id == 5: task_name = 'classification'
             else: raise ValueError('downstream task not supported')
 
             state_to_label = {'EMOTION': 0, 'GAMBLING': 1, 'LANGUAGE': 2, 'MOTOR': 3, 'RELATIONAL': 4, 'SOCIAL': 5, 'WM': 6}

@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcp_downstream/ts_swift_task1.sh task_name batch_size
+# bash scripts/hcp_downstream/ft_swift_task1.sh task_name batch_size
 
 # Set default task_name
 task_name="sex"

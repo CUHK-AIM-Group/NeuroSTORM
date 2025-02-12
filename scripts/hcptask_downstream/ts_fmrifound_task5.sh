@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcp_downstream/ts_fmrifound_task2.sh score_name batch_size
+# bash scripts/hcptask_downstream/ts_fmrifound_task5.sh score_name batch_size
 
 batch_size="12"
 

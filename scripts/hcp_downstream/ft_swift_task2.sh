@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcp_downstream/ts_swift_task2.sh score_name batch_size
+# bash scripts/hcp_downstream/ft_swift_task2.sh score_name batch_size
 
 # Set default score_name
 score_name="MMSE_Score"
