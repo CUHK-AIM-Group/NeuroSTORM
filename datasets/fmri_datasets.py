@@ -2,19 +2,9 @@ import os
 import torch
 from torch.utils.data import Dataset, IterableDataset
 
-import pandas as pd
-from pathlib import Path
 import numpy as np
-import nibabel as nb
-import nilearn
 import random
 import math
-import time
-
-from itertools import cycle
-import glob
-
-from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler, KBinsDiscretizer
 
 
 def pad_to_96(y):
@@ -51,15 +41,11 @@ class BaseDataset(Dataset):
                 load_fnames += ['voxel_mean.pt', 'voxel_std.pt']
 
             last_y = None
-            start_time = time.time()
             for fname in load_fnames:
                 img_path = os.path.join(subject_path, fname)
 
                 try:
-                    load_start_time = time.time()
                     y_loaded = torch.load(img_path).unsqueeze(0)
-                    load_end_time = time.time()
-                    # print(f"load {img_path} execution time: {load_end_time - load_start_time:.4f} seconds")
                     y.append(y_loaded)
                     last_y = y_loaded
                 except:
@@ -70,10 +56,6 @@ class BaseDataset(Dataset):
                     else:
                         y.append(last_y)
             
-            end_time = time.time()
-            # print('number of load_fnames is {}'.format(len(load_fnames)))
-            # print(f"Operation execution time: {end_time - start_time:.4f} seconds")
-
             self.previous_last_y = y[-1]
             y = torch.cat(y, dim=4)
             
@@ -133,7 +115,33 @@ class BaseDataset(Dataset):
         return  len(self.data)
 
     def __getitem__(self, index):
-        raise NotImplementedError("Required function")
+        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
+
+        if self.contrastive or self.mae:
+            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
+            y = pad_to_96(y)
+
+            if self.contrastive:
+                rand_y = pad_to_96(rand_y)
+
+            return {
+                "fmri_sequence": (y, rand_y),
+                "subject_name": subject_name,
+                "target": target,
+                "TR": start_frame,
+                "sex": sex
+            }
+        else:   
+            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
+            y = pad_to_96(y)
+
+            return {
+                "fmri_sequence": y,
+                "subject_name": subject_name,
+                "target": target,
+                "TR": start_frame,
+                "sex": sex,
+            }
 
     def _set_data(self, root, subject_dict):
         raise NotImplementedError("Required function")
@@ -154,42 +162,10 @@ class HCP1200(BaseDataset):
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
                 data.append(data_tuple)
-        
-        # train dataset
-        # for regression tasks
+
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
         return data
-
-    def __getitem__(self, index):
-        _, subject, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # target = self.label_dict[target] if isinstance(target, str) else target.float()
-
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            }
-        else:
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            } 
 
 
 class ABCD(BaseDataset):
@@ -212,57 +188,16 @@ class ABCD(BaseDataset):
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, target, sex)
                 data.append(data_tuple)
-                        
-        # train dataset
-        # for regression tasks
+
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
         return data
 
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        #age = self.label_dict[age] if isinstance(age, str) else age.float()
-        
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
-
 
 class Cobre(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-
 
     def _set_data(self, root, subject_dict):
         data = []
@@ -283,49 +218,10 @@ class Cobre(BaseDataset):
 
         return data
 
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
-
 
 class ADHD200(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # import ipdb; ipdb.set_trace()
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-
 
     def _set_data(self, root, subject_dict):
         data = []
@@ -345,51 +241,12 @@ class ADHD200(BaseDataset):
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
         return data
-
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
         
 
 class UCLA(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # import ipdb; ipdb.set_trace()
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-
-
     def _set_data(self, root, subject_dict):
         data = []
         img_root = os.path.join(root, 'img')
@@ -408,51 +265,12 @@ class UCLA(BaseDataset):
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
         return data
-
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
 
 
 class HCPEP(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # import ipdb; ipdb.set_trace()
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-
-
     def _set_data(self, root, subject_dict):
         data = []
         img_root = os.path.join(root, 'img')
@@ -472,49 +290,10 @@ class HCPEP(BaseDataset):
 
         return data
 
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
-
 
 class GOD(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # import ipdb; ipdb.set_trace()
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-
 
     def _set_data(self, root, subject_dict):
         data = []
@@ -535,66 +314,10 @@ class GOD(BaseDataset):
 
         return data
 
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            }
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
-
 
 class UKB(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # import ipdb; ipdb.set_trace()
-        # from tqdm import tqdm
-
-        # for index in tqdm(range(len(self.data)), desc="Processing sequences"):
-        #     _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        #     try:
-        #         start_time = time.time()
-        #         y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-        #         end_time = time.time()
-        #         print(f"load_sequence execution time: {end_time - start_time:.4f} seconds")
-
-        #         start_time = time.time()
-        #         y = pad_to_96(y)
-        #         end_time = time.time()
-        #         print(f"pad_to_96 execution time: {end_time - start_time:.4f} seconds")
-
-        #         if y.shape != torch.Size([1, 96, 96, 96, 20]):
-        #             ipdb.set_trace()
-        #     except Exception as e:
-        #         print(f"Exception occurred: {e}")
-        #         ipdb.set_trace()
-        #     import ipdb; ipdb.set_trace()
-
-        # import ipdb; ipdb.set_trace()
 
     def _set_data(self, root, subject_dict):
         data = []
@@ -614,46 +337,11 @@ class UKB(BaseDataset):
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, target, sex)
                 data.append(data_tuple)
-                        
-        # train dataset
-        # for regression tasks
+
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
         return data
-
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        #age = self.label_dict[age] if isinstance(age, str) else age.float()
-        
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:   
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
     
 
 class HCPTASK(BaseDataset):
@@ -681,79 +369,3 @@ class HCPTASK(BaseDataset):
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
         return data
-
-    def __getitem__(self, index):
-        _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-
-        #contrastive learning
-        if self.contrastive or self.mae:
-            y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
-            y = pad_to_96(y)
-
-            if self.contrastive:
-                rand_y = pad_to_96(rand_y)
-
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex
-            } 
-
-        # resting or task
-        else:
-            y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-            y = pad_to_96(y)
-
-            return {
-                "fmri_sequence": y,
-                "subject_name": subject_name,
-                "target": target,
-                "TR": start_frame,
-                "sex": sex,
-            }
-
-
-class Dummy(BaseDataset):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs, total_samples=100000)
-        
-
-    def _set_data(self, root, subject_dict):
-        data = []
-        for k in range(0,self.total_samples):
-            data.append((k, 'subj'+ str(k), 'path'+ str(k), self.stride))
-        
-        # train dataset
-        # for regression tasks
-        if self.train: 
-            self.target_values = np.array([val for val in range(len(data))]).reshape(-1, 1)
-            
-        return data
-
-    def __len__(self):
-        return self.total_samples
-
-    def __getitem__(self,idx):
-        _, subj, _, sequence_length = self.data[idx]
-        y = torch.randn(( 1, 96, 96, 96, sequence_length),dtype=torch.float16) #self.y[seq_idx]
-        sex = torch.randint(0,2,(1,)).float()
-        target = torch.randint(0,2,(1,)).float()
-
-        if self.contrastive or self.mae:
-            rand_y = torch.randn(( 1, 96, 96, 96, sequence_length),dtype=torch.float16)
-            return {
-                "fmri_sequence": (y, rand_y),
-                "subject_name": subj,
-                "target": target,
-                "TR": 0,
-                }
-        else:
-            return {
-                    "fmri_sequence": y,
-                    "subject_name": subj,
-                    "target": target,
-                    "TR": 0,
-                    "sex": sex,
-                    } 

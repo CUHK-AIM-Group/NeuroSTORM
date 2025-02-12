@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcp_pretrain/pt_contrastive_swift.sh batch_size
+# bash scripts/abcd_pretrain/pt_contrastive_swift.sh batch_size
 
 batch_size="8"
 
@@ -12,7 +12,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name
-project_name="hcp_pt_swift_mae0.5"
+project_name="abcd_pt_swift_mae0.5"
 
 python main.py \
   --accelerator gpu \
@@ -20,8 +20,8 @@ python main.py \
   --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
-  --dataset_name HCP1200 \
-  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
+  --dataset_name ABCD \
+  --image_path ./data/ABCD_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
   --project_name "$project_name" \
