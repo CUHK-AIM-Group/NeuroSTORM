@@ -1,6 +1,6 @@
 TRAINER_ARGS='--accelerator gpu --max_epochs 30 --num_nodes 1 --devices 4 --strategy DDP'
 MAIN_ARGS='--loggername tensorboard --clf_head_version v3 --dataset_name S1200 --image_path ./data/HCP1200_MNI_to_TRs_minmax'
-DATA_ARGS='--batch_size 16 --num_workers 16 --input_type rest --project_name abcd2hcp_ft_MMSE_Score_train1.0_mamba_mae0.5 --limit_training_samples 1.0'
+DATA_ARGS='--batch_size 16 --num_workers 16 --input_type rest --project_name hcp_CogTotalComp_AgeAdj_mamba'
 OPTIONAL_ARGS='--c_multiplier 2 --last_layer_full_MSA True --downstream_task int_total'
 RESUME_ARGS='--load_model_path ./output/abcd_mae_fmrifound_ratio0.5/checkpt-epoch=37-valid_loss=0.37.ckpt'
 

@@ -19,11 +19,10 @@ from monai.networks.blocks import MLPBlock as Mlp
 
 from monai.networks.layers import DropPath, trunc_normal_
 from monai.utils import ensure_tuple_rep, look_up_option, optional_import
-from mamba_ssm import Mamba
-from mamba_ssm import Mamba2
+from mamba_ssm import Mamba, Mamba2
 
 from .patchembedding import PatchEmbed
-from .redundant_dropout import redundant_dropout
+# from .redundant_dropout import redundant_dropout
 
 rearrange, _ = optional_import("einops", name="rearrange")
 
@@ -251,7 +250,6 @@ class SwinTransformerBlock4D(nn.Module):
         act_layer: str = "GELU",
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         use_checkpoint: bool = False,
-        use_mamba: bool = False,
     ) -> None:
         """
         Args:
@@ -276,26 +274,15 @@ class SwinTransformerBlock4D(nn.Module):
         self.shift_size = shift_size
         self.mlp_ratio = mlp_ratio
         self.use_checkpoint = use_checkpoint
-        self.use_mamba = use_mamba
 
         self.norm1 = norm_layer(dim)
 
-        if self.use_mamba:
-            self.mamba = Mamba(
-                    d_model=dim, # Model dimension d_model
-                    d_state=16,  # SSM state expansion factor
-                    d_conv=4,    # Local convolution width
-                    expand=2,    # Block expansion factor
-            )
-        else:
-            self.attn = WindowAttention4D(
-                dim,
-                window_size=window_size,
-                num_heads=num_heads,
-                qkv_bias=qkv_bias,
-                attn_drop=attn_drop,
-                proj_drop=drop,
-            )
+        self.mamba = Mamba(
+                d_model=dim, # Model dimension d_model
+                d_state=16,  # SSM state expansion factor
+                d_conv=4,    # Local convolution width
+                expand=2,    # Block expansion factor
+        )
 
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -323,10 +310,7 @@ class SwinTransformerBlock4D(nn.Module):
             shifted_x = x
             attn_mask = None
         x_windows = window_partition(shifted_x, window_size)
-        if self.use_mamba:
-            attn_windows = self.mamba(x_windows)
-        else:
-            attn_windows = self.attn(x_windows, mask=attn_mask)
+        attn_windows = self.mamba(x_windows)
         attn_windows = attn_windows.view(-1, *(window_size + (c,)))
         shifted_x = window_reverse(attn_windows, window_size, dims)
         if any(i > 0 for i in shift_size):
@@ -471,8 +455,7 @@ class BasicLayer(nn.Module):
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         c_multiplier: int = 2,
         downsample: Optional[nn.Module] = None,
-        use_checkpoint: bool = False,
-        use_mamba: bool = False,
+        use_checkpoint: bool = False
     ) -> None:
         """
         Args:
@@ -509,8 +492,7 @@ class BasicLayer(nn.Module):
                     attn_drop=attn_drop,
                     drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint,
-                    use_mamba=use_mamba
+                    use_checkpoint=use_checkpoint
                 )
                 for i in range(depth)
             ]
@@ -530,7 +512,7 @@ class BasicLayer(nn.Module):
         wp = int(np.ceil(w / window_size[2])) * window_size[2]
         tp = int(np.ceil(t / window_size[3])) * window_size[3]
         attn_mask = compute_mask([dp, hp, wp, tp], window_size, shift_size, x.device)
-        attn_mask = redundant_dropout(attn_mask, 0.1)
+        # attn_mask = redundant_dropout(attn_mask, 0.1)
         for blk in self.blocks:
             x = blk(x, attn_mask)
         x = x.view(b, d, h, w, t, -1)
@@ -556,8 +538,7 @@ class BasicLayerUp(nn.Module):
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         c_multiplier: int = 2,
         upsample: Optional[nn.Module] = None,
-        use_checkpoint: bool = False,
-        use_mamba: bool = False,
+        use_checkpoint: bool = False
     ) -> None:
         super().__init__()
         self.window_size = window_size
@@ -578,8 +559,7 @@ class BasicLayerUp(nn.Module):
                     attn_drop=attn_drop,
                     drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint,
-                    use_mamba=use_mamba
+                    use_checkpoint=use_checkpoint
                 )
                 for i in range(depth)
             ]
@@ -633,8 +613,7 @@ class BasicLayer_FullAttention(nn.Module):
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         c_multiplier: int = 2,
         downsample: Optional[nn.Module] = None,
-        use_checkpoint: bool = False,
-        use_mamba: bool = False,
+        use_checkpoint: bool = False
     ) -> None:
         """
         Args:
@@ -671,8 +650,7 @@ class BasicLayer_FullAttention(nn.Module):
                     attn_drop=attn_drop,
                     drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint,
-                    use_mamba=use_mamba
+                    use_checkpoint=use_checkpoint
                 )
                 for i in range(depth)
             ]
@@ -739,7 +717,7 @@ class PositionalEmbedding(nn.Module):
 
         return x
 
-class SwinTransformer4D(nn.Module):
+class fMRIFound(nn.Module):
     """
     Swin Transformer based on: "Liu et al.,
     Swin Transformer: Hierarchical Vision Transformer using Shifted Windows
@@ -770,8 +748,6 @@ class SwinTransformer4D(nn.Module):
         last_layer_full_MSA: bool = False,
         downsample="mergingv2",
         num_classes=2,
-        to_float: bool = False,
-        use_mamba: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -807,7 +783,6 @@ class SwinTransformer4D(nn.Module):
         self.window_size = window_size
         self.first_window_size = first_window_size
         self.patch_size = patch_size
-        self.to_float = to_float
         self.patch_embed = PatchEmbed(
             img_size=img_size,
             patch_size=self.patch_size,
@@ -854,8 +829,7 @@ class SwinTransformer4D(nn.Module):
             norm_layer=norm_layer,
             c_multiplier=c_multiplier,
             downsample=down_sample_mod if 0 < self.num_layers - 1 else None,
-            use_checkpoint=use_checkpoint,
-            use_mamba=use_mamba
+            use_checkpoint=use_checkpoint
         )
         self.layers.append(layer)
 
@@ -874,8 +848,7 @@ class SwinTransformer4D(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=down_sample_mod if i_layer < self.num_layers - 1 else None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
 
@@ -893,8 +866,7 @@ class SwinTransformer4D(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
 
@@ -922,18 +894,13 @@ class SwinTransformer4D(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
 
     def forward(self, x):
-        if self.to_float:
-            # converting tensor to float
-            x = x.float()
-
+        x = x.float()
         # torch.Size([16, 1, 96, 96, 96, 20])
-        
         x = self.patch_embed(x)
         # torch.Size([16, 36, 16, 16, 16, 20])
         x = self.pos_drop(x)
@@ -949,7 +916,7 @@ class SwinTransformer4D(nn.Module):
         return x
 
 
-class SwinTransformer4DMAE(nn.Module):
+class fMRIFoundMAE(nn.Module):
     def __init__(
         self,
         img_size: Tuple,
@@ -972,11 +939,9 @@ class SwinTransformer4DMAE(nn.Module):
         c_multiplier: int = 2,
         last_layer_full_MSA: bool = False,
         downsample="mergingv2",
-        to_float: bool = False,
         mask_ratio: float = 0.1,
         spatial_mask="random",
         time_mask="random",
-        use_mamba: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -991,7 +956,6 @@ class SwinTransformer4DMAE(nn.Module):
         self.tube_window_size = [1, 1, 1, window_size[-1]]
         self.first_window_size = first_window_size
         self.patch_size = patch_size
-        self.to_float = to_float
         self.in_chans = in_chans
         self.patch_embed = PatchEmbed(
             img_size=img_size,
@@ -1041,8 +1005,7 @@ class SwinTransformer4DMAE(nn.Module):
             norm_layer=norm_layer,
             c_multiplier=c_multiplier,
             downsample=down_sample_mod if 0 < self.num_layers - 1 else None,
-            use_checkpoint=use_checkpoint,
-            use_mamba=use_mamba
+            use_checkpoint=use_checkpoint
         )
         self.layers.append(layer)
 
@@ -1061,8 +1024,7 @@ class SwinTransformer4DMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=down_sample_mod if i_layer < self.num_layers - 1 else None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
 
@@ -1080,8 +1042,7 @@ class SwinTransformer4DMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
         else:
@@ -1108,8 +1069,7 @@ class SwinTransformer4DMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers.append(layer)
         
@@ -1132,8 +1092,7 @@ class SwinTransformer4DMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 upsample=PatchExpanding if i_layer > 0 else None,
-                use_checkpoint=use_checkpoint,
-                use_mamba=use_mamba
+                use_checkpoint=use_checkpoint
             )
             self.layers_up.append(layer)
         self.norm_up = norm_layer(embed_dim)
@@ -1297,9 +1256,7 @@ class SwinTransformer4DMAE(nn.Module):
         if type(x) == list:
             x = x[0]
 
-        if self.to_float:
-            # converting tensor to float
-            x = x.float()
+        x = x.float()
 
         latent, mask = self.forward_encoder(x)
         pred = self.forward_decoder(latent)

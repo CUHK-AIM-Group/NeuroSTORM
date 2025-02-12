@@ -8,7 +8,7 @@ from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 
-import neptune.new as neptune
+import neptune
 from utils.data_module import fMRIDataModule
 from utils.parser import str2bool
 from models.lightning_model import LightningModel
@@ -19,19 +19,20 @@ def cli_main():
     # ------------ args -------------
     parser = ArgumentParser(add_help=False, formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("--seed", default=1234, type=int, help="random seeds. recommend aligning this argument with data split number to control randomness")
-    parser.add_argument("--dataset_name", type=str, choices=["S1200", "ABCD", "UKB", "Dummy", "Cobre", "ADHD200", "HCPA", "HCPD", "UCLA", "HCPEP", "GOD", "HCPTASK"], default="S1200")
-    parser.add_argument("--downstream_task", type=str, default="sex", help="downstream task")
-    parser.add_argument("--score_name", type=str, default="MMSE_Score")
-    parser.add_argument("--downstream_task_type", type=str, default="default", help="select either classification or regression according to your downstream task")
+    parser.add_argument("--dataset_name", type=str, choices=["HCP1200", "ABCD", "UKB", "Dummy", "Cobre", "ADHD200", "HCPA", "HCPD", "UCLA", "HCPEP", "HCPTASK", "GOD", "NSD", "BOLD5000"], default="HCP1200")
+    parser.add_argument("--downstream_task_id", type=int, default="1", help="downstream task id")
+    parser.add_argument("--downstream_task_type", type=str, default="classification", help="select either classification or regression according to your downstream task")
+    parser.add_argument("--task_name", type=str, default="sex", help="specify the task name")
     parser.add_argument("--loggername", default="default", type=str, help="A name of logger")
-    parser.add_argument("--project_name", default="default", type=str, help="A name of project (Neptune)")
+    parser.add_argument("--project_name", default="default", type=str, help="A name of project")
     parser.add_argument("--resume_ckpt_path", type=str, help="A path to previous checkpoint. Use when you want to continue the training from the previous checkpoints")
     parser.add_argument("--load_model_path", type=str, help="A path to the pre-trained model weight file (.pth)")
     parser.add_argument("--test_only", action='store_true', help="specify when you want to test the checkpoints (model weights)")
     parser.add_argument("--test_ckpt_path", type=str, help="A path to the previous checkpoint that intends to evaluate (--test_only should be True)")
     parser.add_argument("--freeze_feature_extractor", action='store_true', help="Whether to freeze the feature extractor (for evaluating the pre-trained weight)")
+    parser.add_argument("--print_flops", action='store_true', help="Whether to print the number of FLOPs")
     temp_args, _ = parser.parse_known_args()
-    
+
     # Set dataset
     Dataset = fMRIDataModule
 
@@ -72,12 +73,10 @@ def cli_main():
 
     # ------------ logger -------------
     if args.loggername == "tensorboard":
-        # logger = True  # tensor board is a default logger of Trainer class
         dirpath = args.default_root_dir
         logger = TensorBoardLogger(dirpath)
     elif args.loggername == "neptune":
         API_KEY = os.environ.get("NEPTUNE_API_TOKEN")
-        # project_name should be "WORKSPACE_NAME/PROJECT_NAME"
         run = neptune.init(api_token=API_KEY, project=args.project_name, capture_stdout=False, capture_stderr=False, capture_hardware_metrics=False, run=exp_id)
         
         if exp_id == None:
@@ -99,7 +98,7 @@ def cli_main():
             mode="min",
         )
     # callback for classification task
-    elif args.downstream_task == "sex" or args.downstream_task == "Dummy" or args.downstream_task_type == "classification":
+    elif args.downstream_task_type == "classification":
         checkpoint_callback = ModelCheckpoint(
             dirpath=dirpath,
             monitor="valid_acc",
@@ -138,7 +137,6 @@ def cli_main():
             args,
             logger=logger,
             check_val_every_n_epoch=1,
-            #val_check_interval=100 if not args.scalability_check else None,
             callbacks=callbacks
         )
 

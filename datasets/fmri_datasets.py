@@ -139,7 +139,7 @@ class BaseDataset(Dataset):
         raise NotImplementedError("Required function")
  
 
-class S1200(BaseDataset):
+class HCP1200(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

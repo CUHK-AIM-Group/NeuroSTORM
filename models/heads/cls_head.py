@@ -93,11 +93,11 @@ class cls_head_v3(nn.Module):
 class cls_head(nn.Module):
     def __init__(self, version=1, num_classes=2, num_tokens=96):
         super(cls_head, self).__init__()
-        if version == 1:
+        if version == 'v1':
             self.head = cls_head_v1(num_classes, num_tokens)
-        elif version == 2:
+        elif version == 'v2':
             self.head = cls_head_v2(num_classes, num_tokens)
-        elif version == 3:
+        elif version == 'v3':
             self.head = cls_head_v3(num_classes, num_tokens)
 
     def forward(self, x):

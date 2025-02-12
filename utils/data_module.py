@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Subset
-from .datasets.fmri_datasets import S1200, ABCD, UKB, Dummy, Cobre, ADHD200, UCLA, HCPEP, GOD, HCPTASK
+from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from .parser import str2bool
 
@@ -52,10 +52,8 @@ class fMRIDataModule(pl.LightningDataModule):
         self.setup()
 
     def get_dataset(self):
-        if self.hparams.dataset_name == "Dummy":
-            return Dummy
-        elif self.hparams.dataset_name == "S1200":
-            return S1200
+        if self.hparams.dataset_name == "HCP1200":
+            return HCP1200
         elif self.hparams.dataset_name == "ABCD":
             return ABCD
         elif self.hparams.dataset_name == 'UKB':
@@ -76,10 +74,8 @@ class fMRIDataModule(pl.LightningDataModule):
             raise NotImplementedError
 
     def convert_subject_list_to_idx_list(self, train_names, val_names, test_names, subj_list):
-        #subj_idx = np.array([str(x[0]) for x in subj_list])
         subj_idx = np.array([str(x[1]) for x in subj_list])
         S = np.unique([x[1] for x in subj_list])
-        # print(S)
         print('unique subjects:',len(S))  
         train_idx = np.where(np.in1d(subj_idx, train_names))[0].tolist()
         val_idx = np.where(np.in1d(subj_idx, val_names))[0].tolist()
@@ -143,39 +139,38 @@ class fMRIDataModule(pl.LightningDataModule):
         img_root = os.path.join(self.hparams.image_path, 'img')
         final_dict = dict()
 
-        if self.hparams.dataset_name == "S1200":
+        if self.hparams.dataset_name == "HCP1200":
             subject_list = os.listdir(img_root)
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_gender.csv"))
             meta_data_residual = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_precise_age.csv"))
             # meta_data_all = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_all.csv"))
-            if self.hparams.downstream_task == 'sex': task_name = 'Gender'
-            elif self.hparams.downstream_task == 'age': task_name = 'age'
+            if self.hparams.task_name == 'sex': task_name = 'Gender'
+            elif self.hparams.task_name == 'age': task_name = 'age'
             # MMSE_Score Social_Task_Random_Perc_TOM CogTotalComp_Unadj Emotion_Task_Acc Language_Task_Acc Strength_Unadj 
-            elif self.hparams.downstream_task == 'int_total': task_name = self.hparams.score_name
+            elif self.hparams.downstream_task_id == 2: task_name = self.hparams.task_name
             else: raise NotImplementedError()
 
-            print('task_name = {}'.format(task_name))
+            print('downstream_task_id = {}, task_name = {}'.format(self.hparams.downstream_task_id, task_name))
 
-            if self.hparams.downstream_task == 'sex':
+            if task_name == 'Gender':
                 meta_task = meta_data[['Subject',task_name]].dropna()
-            elif self.hparams.downstream_task == 'age':
+            elif task_name == 'age':
                 meta_task = meta_data_residual[['subject',task_name,'sex']].dropna()
-                #rename column subject to Subject
                 meta_task = meta_task.rename(columns={'subject': 'Subject'})
-            elif self.hparams.downstream_task == 'int_total':
+            elif self.hparams.downstream_task_id == 2:
                 meta_task = meta_data[['Subject', task_name, 'Gender']].dropna()  
             
             for subject in subject_list:
                 if int(subject) in meta_task['Subject'].values:
-                    if self.hparams.downstream_task == 'sex':
+                    if task_name == 'Gender':
                         target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
                         target = 1 if target == "M" else 0
                         sex = target
-                    elif self.hparams.downstream_task == 'age':
+                    elif task_name == 'age':
                         target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
                         sex = meta_task[meta_task["Subject"]==int(subject)]["sex"].values[0]
                         sex = 1 if sex == "M" else 0
-                    elif self.hparams.downstream_task == 'int_total':
+                    elif self.hparams.downstream_task_id == 2:
                         target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
                         sex = meta_task[meta_task["Subject"]==int(subject)]["Gender"].values[0]
                         sex = 1 if sex == "M" else 0
@@ -427,7 +422,8 @@ class fMRIDataModule(pl.LightningDataModule):
                 "stride_between_seq": self.hparams.stride_between_seq,
                 "stride_within_seq": self.hparams.stride_within_seq,
                 "with_voxel_norm": self.hparams.with_voxel_norm,
-                "downstream_task": self.hparams.downstream_task,
+                "downstream_task_id": self.hparams.downstream_task_id,
+                "task_name": self.hparams.task_name,
                 "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
                 "input_type": self.hparams.input_type,
                 "label_scaling_method": self.hparams.label_scaling_method,
@@ -461,12 +457,12 @@ class fMRIDataModule(pl.LightningDataModule):
         self.val_dataset = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False) 
         self.test_dataset = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
         
-        print("number of train_subj:", len(train_dict))
-        print("number of val_subj:", len(val_dict))
-        print("number of test_subj:", len(test_dict))
-        print("length of train_idx:", len(self.train_dataset.data))
-        print("length of val_idx:", len(self.val_dataset.data))  
-        print("length of test_idx:", len(self.test_dataset.data))
+        print("number of train subjects:", len(train_dict))
+        print("number of val subjects:", len(val_dict))
+        print("number of test subjects:", len(test_dict))
+        print("number of train samples:", len(self.train_dataset.data))
+        print("number of val samples:", len(self.val_dataset.data))  
+        print("number of test samples:", len(self.test_dataset.data))
         
         # DistributedSampler is internally called in pl.Trainer
         def get_params(train):
@@ -509,7 +505,7 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--train_split", default=0.7, type=float)
         group.add_argument("--val_split", default=0.15, type=float)
         group.add_argument("--batch_size", type=int, default=4)
-        group.add_argument("--eval_batch_size", type=int, default=16)
+        group.add_argument("--eval_batch_size", type=int, default=8)
         group.add_argument("--img_size", nargs="+", default=[96, 96, 96, 20], type=int, help="image size (adjust the fourth dimension according to your --sequence_length argument)")
         group.add_argument("--sequence_length", type=int, default=20)
         group.add_argument("--stride_between_seq", type=int, default=1, help="skip some fMRI volumes between fMRI sub-sequences")

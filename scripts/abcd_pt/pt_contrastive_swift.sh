@@ -1,4 +1,4 @@
-TRAINER_ARGS='--accelerator gpu --max_epochs 30 --precision 16 --num_nodes 1 --devices 2 --strategy DDP'
+TRAINER_ARGS='--accelerator gpu --max_epochs 30 --num_nodes 1 --devices 2 --strategy DDP'
 MAIN_ARGS='--loggername tensorboard --clf_head_version v3 --dataset_name S1200 --image_path ./data/HCP1200_MNI_to_TRs_minmax'
 DATA_ARGS='--batch_size 16 --num_workers 16 --input_type rest --project_name abcd_contrastive_swift'
 OPTIONAL_ARGS='--c_multiplier 2 --last_layer_full_MSA True --clf_head_version v1 --downstream_task int_total'

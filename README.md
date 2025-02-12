@@ -25,27 +25,26 @@ cd fMRIFound
 conda create -n fmrifound python=3.10
 conda activate fmrifound
 
-# install dependencies
-pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+# upgrade gcc compiler (optional)
+conda install gcc_impl_linux-64=11.2.0
+ln -s /your/path/to/anaconda3/envs/fmrifound/libexec/gcc/x86_64-conda-linux-gnu/11.2.0/gcc /your/path/to/anaconda3/envs/fmrifound/bin/gcc
+conda install gxx_linux-64=11.2.0
 conda install ninja
-pip install tensorboard tensorboardX tqdm ipdb nvitop monai==1.3.0
 
-# if you use mamba
-pip install mamba_ssm causal-conv1d
+# set environment variables for gcc 11.2 and cuda 11.8 (optional)
+source ./set_env.sh
+
+# install dependencies
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+pip install tensorboard tensorboardX tqdm ipdb nvitop monai==1.3.0 
+pip install pytorch-lightning==1.9.4 neptune nibabel nilearn numpy==1.22.4
+
+# install mamba_ssm, it may takes a few minutes to download the .whl files
+pip install https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.5.0.post8/causal_conv1d-1.5.0.post8+cu11torch2.1cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+pip install https://github.com/state-spaces/mamba/releases/download/v2.2.2/mamba_ssm-2.2.2+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
  ```
 
-We also tested the following combinations of Python, CUDA, and PyTorch versions. You can visit the linked page to obtain installation instructions for the corresponding versions.
-
-| **Python** | **CUDA** | **PyTorch** | **Link** |
-|:----------:|:--------:|:-----------:|:--------:|
-| xx         |          |             |          |
-| xx         |          |             |          |
-| xx         |          |             |          |
-| xx         |          |             |          |
-| xx         |          |             |          |
-| xx         |          |             |          |
-| xx         |          |             |          |
-
+If you encounter issues when installing PyTorch and mamba_ssm, please try upgrading the GCC compiler and setting environment variables to ensure the correct versions of the GCC compiler and CUDA are being used.
 
 
 ## 2. Project Structure
@@ -340,7 +339,6 @@ project_name="hcp_ts_${score_name}_train1.0_fmrifound"
 python project/main.py \
   --accelerator gpu \
   --max_epochs 30 \
-  --precision 32 \
   --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
@@ -359,14 +357,13 @@ python project/main.py \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \
-  --model swin4d_ver7 \
+  --model fmrifound \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 20 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
-  --img_size 96 96 96 20 \
-  --use_mamba
+  --img_size 96 96 96 20 
  ```
 
  ### 4.4 fMRI retrieval scripts

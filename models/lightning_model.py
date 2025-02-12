@@ -21,10 +21,10 @@ import nibabel as nb
 
 
 from .load_model import load_model
-from ..utils.metrics import Metrics
-from ..utils.parser import str2bool
-from ..utils.losses import NTXentLoss, global_local_temporal_contrastive
-from ..utils.lr_scheduler import WarmupCosineSchedule, CosineAnnealingWarmUpRestarts
+from utils.metrics import Metrics
+from utils.parser import str2bool
+from utils.losses import NTXentLoss, global_local_temporal_contrastive
+from utils.lr_scheduler import WarmupCosineSchedule, CosineAnnealingWarmUpRestarts
 
 from einops import rearrange
 from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler, KBinsDiscretizer
@@ -40,31 +40,30 @@ class LightningModel(pl.LightningModule):
         if self.hparams.label_scaling_method == 'standardization':
             scaler = StandardScaler()
             normalized_target_values = scaler.fit_transform(target_values)
-            print(f'target_mean:{scaler.mean_[0]}, target_std:{scaler.scale_[0]}')
         elif self.hparams.label_scaling_method == 'minmax': 
             scaler = MinMaxScaler()
             normalized_target_values = scaler.fit_transform(target_values)
-            print(f'target_max:{scaler.data_max_[0]},target_min:{scaler.data_min_[0]}')
         self.scaler = scaler
-        print(self.hparams.model)
+        print('model name = {}'.format(self.hparams.model))
         self.model = load_model(self.hparams.model, self.hparams)
         self.start_time_data = time.time()
 
-        # from torchsummary import summary
-        # from thop import profile
+        if self.hparams.print_flops:
+            from torchsummary import summary
+            from thop import profile
 
-        # input = torch.randn((1, 1, 48, 48, 48, 20)).cuda()
-        
-        # flops, params = profile(self.model.cuda(), inputs=(input, ))
-        # print('FLOPs = ' + str(flops/1000**3) + 'G')
-        # print('Params = ' + str(params/1000**2) + 'M')
-        # import ipdb; ipdb.set_trace()
+            input = torch.randn((1, 1, 48, 48, 48, 20)).cuda()
+            
+            flops, params = profile(self.model.cuda(), inputs=(input, ))
+            print('FLOPs = ' + str(flops/1000**3) + 'G')
+            print('Params = ' + str(params/1000**2) + 'M')
+            import ipdb; ipdb.set_trace()
 
         # Heads
         if not self.hparams.pretraining:
-            if self.hparams.downstream_task == 'sex' or self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+            if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
                 self.output_head = load_model("clf_mlp", self.hparams)
-            elif self.hparams.downstream_task == 'age' or self.hparams.downstream_task == 'int_total' or self.hparams.downstream_task == 'int_fluid' or self.hparams.downstream_task_type == 'regression':
+            elif self.hparams.downstream_task_type == 'regression':
                 self.output_head = load_model("reg_mlp", self.hparams)
         elif self.hparams.use_contrastive:
             self.output_head = load_model("emb_mlp", self.hparams)
@@ -130,12 +129,11 @@ class LightningModel(pl.LightningModule):
             feature = feature[0]
 
         # Classification task
-        if self.hparams.downstream_task == 'sex' or self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+        if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             logits = self.output_head(feature).squeeze() #self.clf(feature).squeeze()
             target = target_value.float().squeeze()
         # Regression task
-        elif self.hparams.downstream_task == 'age' or self.hparams.downstream_task == 'int_total' or self.hparams.downstream_task == 'int_fluid' or self.hparams.downstream_task_type == 'regression':
-            # target_mean, target_std = self.determine_target_mean_std()
+        elif self.hparams.downstream_task_type == 'regression':
             logits = self.output_head(feature) # (batch,1) or # tuple((batch,1), (batch,1))
             unnormalized_target = target_value.float() # (batch,1)
             if self.hparams.label_scaling_method == 'standardization': # default
@@ -241,7 +239,7 @@ class LightningModel(pl.LightningModule):
             # print(f"Model time: {model_time:.6f} seconds")
             self.start_time_data = time.time()
 
-            if self.hparams.downstream_task == 'sex' or self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+            if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
                 if self.hparams.num_classes == 2:
                     loss = F.binary_cross_entropy_with_logits(logits, target)
                     acc = self.metric.get_accuracy_binary(logits, target.float().squeeze())
@@ -254,7 +252,7 @@ class LightningModel(pl.LightningModule):
                     f"{mode}_acc": acc,
                 }
 
-            elif self.hparams.downstream_task == 'age' or self.hparams.downstream_task == 'int_total' or self.hparams.downstream_task == 'int_fluid' or self.hparams.downstream_task_type == 'regression':
+            elif self.hparams.downstream_task_type == 'regression':
                 loss = F.mse_loss(logits.squeeze(), target.squeeze())
                 l1 = F.l1_loss(logits.squeeze(), target.squeeze())
                 result_dict = {
@@ -288,7 +286,7 @@ class LightningModel(pl.LightningModule):
             subj_avg_logits = torch.stack(subj_avg_logits) 
             subj_targets = torch.tensor(subj_targets, device = total_out_target.device) 
         
-        if self.hparams.downstream_task == 'sex' or self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+        if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             if self.hparams.adjust_thresh:
                 # move threshold to maximize balanced accuracy
                 best_bal_acc = 0
@@ -338,7 +336,7 @@ class LightningModel(pl.LightningModule):
             self.log(f"{mode}_AUROC", auroc, sync_dist=True)
 
         # regression target is normalized
-        elif self.hparams.downstream_task == 'age' or self.hparams.downstream_task == 'int_total' or self.hparams.downstream_task == 'int_fluid' or self.hparams.downstream_task_type == 'regression':          
+        elif self.hparams.downstream_task_type == 'regression':          
             mse = F.mse_loss(subj_avg_logits, subj_targets)
             mae = F.l1_loss(subj_avg_logits, subj_targets)
             
@@ -410,7 +408,7 @@ class LightningModel(pl.LightningModule):
     def _save_predictions(self,total_subjs,total_out, mode):
         self.subject_accuracy = {}
         for subj, output in zip(total_subjs,total_out):
-            if self.hparams.downstream_task == 'sex':
+            if self.hparams.task_name == 'sex':
                 score = torch.sigmoid(output[0]).item()
             else:
                 score = output[0].item()
@@ -597,7 +595,6 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--last_layer_full_MSA", type=str2bool, default=False, help="whether to use full-scale multi-head self-attention at the last layers")
         group.add_argument("--clf_head_version", type=str, default="v1", help="clf head version, v2 has a hidden layer")
         group.add_argument("--attn_drop_rate", type=float, default=0, help="dropout rate of attention layers")
-        group.add_argument("--use_mamba", action='store_true', help="whether to use mamba")
 
         # others
         group.add_argument("--scalability_check", action='store_true', help="whether to check scalability")

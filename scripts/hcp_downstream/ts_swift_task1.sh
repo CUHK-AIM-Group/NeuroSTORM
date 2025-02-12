@@ -1,18 +1,23 @@
 #!/bin/bash
-# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh batch_size
+# bash sample_scripts/hcp_ft/ts_abcd2hcp_mamba.sh task_name batch_size
 
+# Set default score_name
+task_name="sex"
 batch_size="12"
 
 # Override with the arguments if provided
 if [ ! -z "$1" ]; then
-  batch_size=$1
+  task_name=$1
+fi
+if [ ! -z "$2" ]; then
+  batch_size=$2
 fi
 
 # export CUDA_VISIBLE_DEVICES=0,1
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using score_name
-project_name="hcp_ts_state_classification_train1.0_swift"
+project_name="hcp_ts_${task_name}_train1.0_swift"
 
 python project/main.py \
   --accelerator gpu \
@@ -21,8 +26,8 @@ python project/main.py \
   --strategy ddp \
   --loggername tensorboard \
   --clf_head_version v2 \
-  --dataset_name HCPTASK \
-  --image_path ./data/HCPTASK_MNI_to_TRs_minmax \
+  --dataset_name S1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
   --input_type rest \
@@ -30,9 +35,7 @@ python project/main.py \
   --limit_training_samples 1.0 \
   --c_multiplier 2 \
   --last_layer_full_MSA True \
-  --downstream_task classification \
-  --downstream_task_type classification \
-  --num_classes 7 \
+  --downstream_task "$task_name" \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \

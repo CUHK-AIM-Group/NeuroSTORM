@@ -17,8 +17,6 @@ project_name="hcp_ts_state_classification_train1.0_mamba"
 python project/main.py \
   --accelerator gpu \
   --max_epochs 30 \
-  --precision 32 \
-  --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
   --clf_head_version v2 \

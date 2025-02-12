@@ -1,4 +1,4 @@
-TRAINER_ARGS='--accelerator gpu --max_epochs 30 --precision 32 --num_nodes 1 --devices 2 --strategy DDP'
+TRAINER_ARGS='--accelerator gpu --max_epochs 30 --num_nodes 1 --devices 2 --strategy DDP'
 MAIN_ARGS='--loggername tensorboard --clf_head_version v3 --dataset_name HCPEP --image_path ./data/HCPEP_MNI_to_TRs_minmax'
 DATA_ARGS='--batch_size 16 --num_workers 16 --input_type rest --project_name abcd2hcpep_ft_dx_train0.3_mamba_mae0.5 --limit_training_samples 0.3'
 OPTIONAL_ARGS='--c_multiplier 2 --last_layer_full_MSA True --downstream_task diagnosis --downstream_task_type classification'
