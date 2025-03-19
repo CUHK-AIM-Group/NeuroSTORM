@@ -1,14 +1,14 @@
 #!/bin/bash
 # bash scripts/hcp_pretrain/pt_mae_fmrifound.sh batch_size
 
-batch_size="8"
+batch_size="12"
 
 if [ ! -z "$1" ]; then
   batch_size=$1
 fi
 
 # We will use all aviailable GPUs, and automatically set the same batch size for each GPU
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name
@@ -23,6 +23,7 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --batch_size "$batch_size" \
+  --eval_batch_size "$batch_size" \
   --num_workers "$batch_size" \
   --project_name "$project_name" \
   --c_multiplier 2 \
@@ -39,7 +40,7 @@ python main.py \
   --model fmrifound \
   --depth 2 2 6 2 \
   --embed_dim 36 \
-  --sequence_length 20 \
-  --img_size 96 96 96 20 \
+  --sequence_length 40 \
+  --img_size 96 96 96 40 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4

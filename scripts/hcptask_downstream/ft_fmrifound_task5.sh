@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcptask_downstream/ft_fmrifound_task5.sh score_name batch_size
+# bash scripts/hcptask_downstream/ft_fmrifound_task5.sh batch_size
 
 batch_size="12"
 
@@ -15,7 +15,7 @@ export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using score_name
-project_name="hcp_ts_fmrifound_task5_train1.0"
+project_name="hcp_ft_fmrifound_task5_train1.0"
 
 python main.py \
   --accelerator gpu \
@@ -25,7 +25,7 @@ python main.py \
   --loggername tensorboard \
   --clf_head_version v1 \
   --dataset_name HCPTASK \
-  --image_path ./data/HCPTASK_MNI_to_TRs_minmax \
+  --image_path ./data/HCPTASK_preprocessed \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
   --project_name "$project_name" \
@@ -34,6 +34,7 @@ python main.py \
   --last_layer_full_MSA True \
   --downstream_task_id 5 \
   --downstream_task_type classification \
+  --num_classes 7 \
   --task_name "state_classification" \
   --dataset_split_num 1 \
   --seed 1 \
@@ -41,8 +42,8 @@ python main.py \
   --model fmrifound \
   --depth 2 2 6 2 \
   --embed_dim 36 \
-  --sequence_length 20 \
-  --img_size 96 96 96 20 \
+  --sequence_length 40 \
+  --img_size 96 96 96 40 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
   --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt

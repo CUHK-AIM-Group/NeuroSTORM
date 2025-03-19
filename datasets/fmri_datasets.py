@@ -24,7 +24,7 @@ class BaseDataset(Dataset):
         super().__init__()      
         self.register_args(**kwargs)
         self.sample_duration = self.sequence_length * self.stride_within_seq
-        self.stride = max(round(self.stride_between_seq * self.sample_duration),1)
+        self.stride = max(round(self.stride_between_seq * self.sample_duration), 1)
         self.data = self._set_data(self.root, self.subject_dict)
     
     def register_args(self,**kwargs):
@@ -330,7 +330,7 @@ class UKB(BaseDataset):
             subject_path = os.path.join(img_root, subject_name)
 
             num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
-            if num_frames < 20:
+            if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
 
@@ -357,13 +357,13 @@ class HCPTASK(BaseDataset):
             subject_path = os.path.join(img_root, subject_name)
 
             num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
-            if num_frames < 20:
+            if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
 
-            for start_frame in range(0, session_duration, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, target, sex)
-                data.append(data_tuple)
+            # we only use first n frames for task fMRI
+            data_tuple = (i, subject_name, subject_path, 0, self.stride, num_frames, target, sex)
+            data.append(data_tuple)
                         
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)

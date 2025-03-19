@@ -45,4 +45,6 @@ python main.py \
   --sequence_length 40 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
-  --img_size 96 96 96 40
+  --img_size 96 96 96 40 \
+  --test_only \
+  --test_ckpt_path ./output/volume-based/hcp_ts_swift_task5_train1.0/checkpt-epoch=26-valid_acc=0.24.ckpt

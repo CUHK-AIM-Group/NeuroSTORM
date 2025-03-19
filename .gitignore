@@ -7,3 +7,4 @@ causal_conv1d-1.5.0.post8+cu11torch2.1cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
 utils/__pycache__
 data
 output
+attn.pkl

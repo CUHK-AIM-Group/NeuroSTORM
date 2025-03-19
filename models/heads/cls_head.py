@@ -26,7 +26,7 @@ class cls_head_v1(nn.Module):
 
 class cls_head_v2(nn.Module):
     def __init__(self, num_classes=2, num_tokens = 96):
-        super(cls_head_v1, self).__init__()
+        super(cls_head_v2, self).__init__()
         num_outputs = 1 if num_classes == 2 else num_classes
         self.hidden = nn.Linear(num_tokens, 4*num_tokens)
         self.head = nn.Linear(4*num_tokens, num_outputs)

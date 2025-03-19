@@ -1,6 +1,6 @@
 <div align="center">    
  
-# fMRIFound: Towards a general-purpose foundation model for fMRI analysis
+# fMRI-GPT: Towards a general-purpose foundation model for fMRI analysis
 
 </div>
 
@@ -8,7 +8,7 @@
   <a href='LICENSE'><img src='https://img.shields.io/badge/license-MIT-yellow'></a>
   <a href=''><img src='https://img.shields.io/badge/arXiv-fMRIFound-red'></a>  &nbsp;
   <a href=''><img src='https://img.shields.io/badge/Project-fMRIFound-green'></a> &nbsp;
-  <a href=""><img src="https://img.shields.io/badge/GitHub-fMRIFound-9E95B7?logo=github"></a> &nbsp; 
+  <a href=''><img src="https://img.shields.io/badge/GitHub-fMRIFound-9E95B7?logo=github"></a> &nbsp; 
   <a href=''><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Model-fMRIFound-blue'></a> &nbsp; 
   <br>
 </div>
@@ -18,18 +18,18 @@
 
 This repo provides a platform that covers all aspects involved in using deep learning for fMRI analysis. It is moderately encapsulated, highly customizable, and supports most common tasks and methods out of the box. 
 
-This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. fMRIFound is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of fMRIFound in this repo. Specifically, our code provides the following:
+This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. fMRI-GPT is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of fMRI-GPT in this repo. Specifically, our code provides the following:
 
-- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like fMRIFound), 2D time series data (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
-- Trainer for pre-training, including the MAE-based mechanism proposed in fMRIFound and the contrastive learning approach in SwiFT.
-- Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in fMRIFound.
+- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like fMRI-GPT), 2D time series data (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
+- Trainer for pre-training, including the MAE-based mechanism proposed in fMRI-GPT and the contrastive learning approach in SwiFT.
+- Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in fMRI-GPT.
 - A comprehensive fMRI benchmark, including five tasks: Age and Gender Prediction, Phenotype Prediction, Disease Diagnosis, fMRI Retrieval, and Task fMRI State Classification.
-- Implementations of fMRIFound and other commonly used fMRI analysis models.
+- Implementations of fMRI-GPT and other commonly used fMRI analysis models.
 - Customization options for all stages. You can quickly add custom preprocessing procedures, pre-training methods, fine-tuning strategies, new downstream tasks, and implement other models on the platform.
 
 
-## Updates
-* __[2025.02.13]__: Release the code of fMRIFound model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
+## 🚀 Updates
+* __[2025.02.13]__: Release the code of fMRI-GPT model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
 
 
 ## 1. How to install
@@ -102,7 +102,7 @@ Our directory structure looks like this:
 
 ### 3.1 Pre-processing
 
-We provide a tool for batch preprocessing of fMRI volumes. With this tool, you can preprocess all supported datasets in bulk, including background removal, resizing (via interpolation algorithms or by discarding certain slices), Z-normalization, and saving each frame as a .pt file. If your CPU computational power is limited, we recommend preprocessing all datasets. If your training bottleneck lies in disk read speed, you can skip this step and process the data online during training.
+We provide a tool for batch preprocessing of fMRI volumes. Please make sure your data have been aligned into MNI152 space. With this tool, you can preprocess all supported datasets in bulk, including background removal, resizing (via interpolation algorithms or by discarding certain slices), Z-normalization, and saving each frame as a .pt file. If your CPU computational power is limited, we recommend preprocessing all datasets. If your training bottleneck lies in disk read speed, you can skip this step and process the data online during training.
 
 Here is an example of pre-processing HCP-YA dataset:
 
@@ -344,8 +344,9 @@ python main.py \
 
 ## 5. How to ues your own dataset
 
-First, please refer to the following links to align the fMRI data to MNI152 space or directly download aligned fMRI data.
+First, please refer to the following links to pre-process fMRI sequences and align the fMRI data to MNI152 space or directly download processed fMRI data (please contact to the authors).
 - https://fmriprep.org/en/stable/
+- https://github.com/Washington-University/HCPpipelines
 - https://biobank.ctsu.ox.ac.uk/crystal/crystal/docs/brain_mri.pdf
 
 Next, you can add your dataset in `preprocessing_volume.py`. There are two places need to modify: one is the naming convention for Volume data, located in the `determine_subject_name` function. The second is to confirm the resize method. If your data has similar resolution to HCP-YA, you can use the `select_middle_96` method; otherwise, use the `resize_to_96` method.
@@ -486,7 +487,14 @@ class cls_head(nn.Module):
 
 
 ## 7. Pretrained model checkpoints
-We have provided the checkpoint files on HuggingFace, and you can also use the HuggingFace API to load them directly in your code.
+We have provided the checkpoint files on HuggingFace, so you can download these files to your working directory. Also, the code will try to download checkpoint files by HuggingFace API if it cannot find the checkpoint files locally.
+
+
+## ✏️ Todo List
+- [ ] Release code for computing the Functional Correlation Matrix
+- [ ] Release code for task 4
+- [ ] Support for custmized mamba scanning startegies
+- [ ] Support for more pre-training startegies
 
 
 ## Acknowledgements
@@ -496,4 +504,6 @@ Greatly appreciate the tremendous effort for the following projects!
 - https://github.com/LifangHe/BrainGNN_Pytorch
 - https://github.com/MedARC-AI/MindEyeV2
 - https://fsl.fmrib.ox.ac.uk/fsl/docs
+- https://github.com/Washington-University/HCPpipelines
+- https://github.com/nipreps/fmriprep
 
