@@ -55,4 +55,5 @@ python main.py \
   --img_size 96 96 96 20 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
+  # --freeze_feature_extractor \
   --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt

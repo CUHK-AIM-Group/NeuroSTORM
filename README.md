@@ -1,6 +1,6 @@
 <div align="center">    
  
-# fMRI-GPT: Towards a general-purpose foundation model for fMRI analysis
+# NeuroSTORM: Towards a general-purpose foundation model for fMRI analysis
 
 </div>
 
@@ -18,18 +18,18 @@
 
 This repo provides a platform that covers all aspects involved in using deep learning for fMRI analysis. It is moderately encapsulated, highly customizable, and supports most common tasks and methods out of the box. 
 
-This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. fMRI-GPT is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of fMRI-GPT in this repo. Specifically, our code provides the following:
+This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. NeuroSTORM is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of NeuroSTORM in this repo. Specifically, our code provides the following:
 
-- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like fMRI-GPT), 2D time series data (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
-- Trainer for pre-training, including the MAE-based mechanism proposed in fMRI-GPT and the contrastive learning approach in SwiFT.
-- Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in fMRI-GPT.
+- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like NeuroSTORM), 2D time series data (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
+- Trainer for pre-training, including the MAE-based mechanism proposed in NeuroSTORM and the contrastive learning approach in SwiFT.
+- Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in NeuroSTORM.
 - A comprehensive fMRI benchmark, including five tasks: Age and Gender Prediction, Phenotype Prediction, Disease Diagnosis, fMRI Retrieval, and Task fMRI State Classification.
-- Implementations of fMRI-GPT and other commonly used fMRI analysis models.
+- Implementations of NeuroSTORM and other commonly used fMRI analysis models.
 - Customization options for all stages. You can quickly add custom preprocessing procedures, pre-training methods, fine-tuning strategies, new downstream tasks, and implement other models on the platform.
 
 
 ## 🚀 Updates
-* __[2025.02.13]__: Release the code of fMRI-GPT model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
+* __[2025.02.13]__: Release the code of NeuroSTORM model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
 
 
 ## 1. How to install
