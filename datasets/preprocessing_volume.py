@@ -56,12 +56,12 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     if not isExist:
         os.makedirs(save_dir)
     
-    if dataset_name in ['ukb', 'abcd', 'hcp', 'hcpd', 'hcpep', 'hcptask']:
+    if dataset_name in ['ukb', 'abcd', 'hcp', 'hcpd', 'hcpep', 'hcptask', 'movie']:
         data = select_middle_96(data)
     elif dataset_name in ['adhd200', 'cobre', 'ucla', 'god']:
         data = resize_to_96(data)
 
-    if dataset_name in ['adhd200', 'god', 'hcp', 'hcpd', 'ukb', 'hcptask']:
+    if dataset_name in ['adhd200', 'god', 'hcp', 'hcpd', 'ukb', 'hcptask', 'movie']:
         background = data==0
     else:
         if dataset_name in ['abcd', 'cobre', 'hcpep']:
@@ -122,35 +122,20 @@ def main():
     queue = Queue() 
     count = 0
 
-    if args.num_processes == 1:
-        for filename in sorted(filenames):
-            if not filename.endswith('.nii.gz') or 'mask' in filename or 'imagery' in filename:
-                continue
+    for filename in sorted(filenames):
+        if not (filename.endswith('.nii.gz') or filename.endswith('.nii')) or 'mask' in filename or 'imagery' in filename:
+            continue
 
-            # Determine subject name based on dataset
-            subj_name = determine_subject_name(dataset_name, filename)
-
-            if args.delete_nii:
-                handle_delete_nii(load_root, save_root, filename, subj_name)
-            else:
-                try:
-                    count += 1
+        # Determine subject name based on dataset
+        subj_name = determine_subject_name(dataset_name, filename)
+        if args.delete_nii:
+            handle_delete_nii(load_root, save_root, filename, subj_name)
+        else:
+            try:
+                count += 1
+                if args.num_processes == 1:
                     read_data(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method)
-                except Exception as e:
-                    print(f'encountered problem with {filename}: {e}')
-    else:
-        processes = []
-        for filename in sorted(filenames):
-            if not filename.endswith('.nii.gz') or 'mask' in filename or 'imagery' in filename:
-                continue
-
-            subj_name = determine_subject_name(dataset_name, filename)
-
-            if args.delete_nii:
-                handle_delete_nii(load_root, save_root, filename, subj_name)
-            else:
-                try:
-                    count += 1
+                else:
                     p = Process(target=read_data, args=(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method))
                     processes.append(p)
                     p.start()
@@ -158,10 +143,13 @@ def main():
                         for p in processes:
                             p.join()
                         processes = []
-                except Exception as e:
-                    print(f'encountered problem with {filename}: {e}')
-        for p in processes:
-            p.join()
+            except Exception as e:
+                print(f'encountered problem with {filename}: {e}')
+        
+        # if args.num_processes > 1:
+        #     for p in processes:
+        #         p.join()
+
 
 def determine_subject_name(dataset_name, filename):
     if dataset_name in ['abcd', 'cobre']:
@@ -181,6 +169,8 @@ def determine_subject_name(dataset_name, filename):
     elif dataset_name == 'ukb':
         return filename.split('.')[0]
     elif dataset_name == 'hcptask':
+        return filename.split('.')[0]
+    elif dataset_name == 'movie':
         return filename.split('.')[0]
 
 def handle_delete_nii(load_root, save_root, filename, subj_name):

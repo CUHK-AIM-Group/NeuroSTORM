@@ -1,14 +1,14 @@
 #!/bin/bash
 # bash scripts/hcp_pretrain/pt_contrastive_swift.sh batch_size
 
-batch_size="8"
+batch_size="12"
 
 if [ ! -z "$1" ]; then
   batch_size=$1
 fi
 
 # We will use all aviailable GPUs, and automatically set the same batch size for each GPU
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=0,1
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name

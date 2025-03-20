@@ -21,7 +21,7 @@ if [ ! -z "$2" ]; then
 fi
 
 # We will use all aviailable GPUs, and automatically set the same batch size for each GPU
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using task_name

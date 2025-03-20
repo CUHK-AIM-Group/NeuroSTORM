@@ -149,24 +149,24 @@ def cli_main():
 
     # ------------ model -------------
     model = LightningModel(data_module = data_module, **vars(args))
-    import ipdb; ipdb.set_trace()
 
     path = None
-    if args.load_model_path is not None and os.path.exists(args.load_model_path):
-        print(f'loading model from {args.load_model_path}')
-        path = args.load_model_path
-    else:
-        print('cannot find the ckpt file. try to download model from huggingface')
-        repo_id = "zxcvb20001/fMRI-GPT"
-        if args.model == 'fmrifound':
-            filename = "fmrifound/{}".format(os.path.basename(args.load_model_path))
-        elif args.model in ['swift']:
-            filename = "volume-based/{}/{}".format(args.model, os.path.basename(args.load_model_path))
-        
-        try:
-            path = hf_hub_download(repo_id=repo_id, filename=filename)
-        except:
-            print('train from scratch')
+    if args.load_model_path is not None:
+        if os.path.exists(args.load_model_path):
+            print(f'loading model from {args.load_model_path}')
+            path = args.load_model_path
+        else:
+            print('cannot find the ckpt file. try to download model from huggingface')
+            repo_id = "zxcvb20001/fMRI-GPT"
+            if args.model == 'fmrifound':
+                filename = "fmrifound/{}".format(os.path.basename(args.load_model_path))
+            elif args.model in ['swift']:
+                filename = "volume-based/{}/{}".format(args.model, os.path.basename(args.load_model_path))
+            
+            try:
+                path = hf_hub_download(repo_id=repo_id, filename=filename)
+            except:
+                print('train from scratch')
     
     if path is not None:
         ckpt = torch.load(path)
