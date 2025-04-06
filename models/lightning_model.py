@@ -74,9 +74,6 @@ class LightningModel(pl.LightningModule):
 
         self.metric = Metrics()
 
-        if self.hparams.adjust_thresh:
-            self.threshold = 0
-
     def forward(self, x):
         return self.output_head(self.model(x))
     
@@ -128,6 +125,7 @@ class LightningModel(pl.LightningModule):
         if type(feature) == tuple:
             feature = feature[0]
 
+        import ipdb; ipdb.set_trace()
         # Classification task
         if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             logits = self.output_head(feature).squeeze() #self.clf(feature).squeeze()
@@ -268,6 +266,21 @@ class LightningModel(pl.LightningModule):
         subj_avg_logits = []
         subj_targets = []
 
+        if self.hparams.task_name == 'movie_classification':
+            acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
+            acc3_func = MulticlassAccuracy(num_classes=self.hparams.num_classes, top_k=3).to(total_out_logits.device)
+            auroc_func = MulticlassAUROC(num_classes=self.hparams.num_classes).to(total_out_logits.device)
+
+            acc = acc_func(total_out_logits, total_out_target.long())
+            acc3 = acc3_func(total_out_logits, total_out_target.long())
+            # auroc = auroc_func(total_out_logits, total_out_target.long())
+
+            self.log(f"{mode}_acc", acc, sync_dist=True)
+            self.log(f"{mode}_acc3", acc3, sync_dist=True)
+            # self.log(f"{mode}_AUROC", auroc, sync_dist=True)
+
+            return
+
         if self.hparams.num_classes == 2:
             for subj in subjects:
                 subj_logits = total_out_logits[subj_array == subj]
@@ -283,36 +296,13 @@ class LightningModel(pl.LightningModule):
             subj_avg_logits = torch.stack(subj_avg_logits) 
             subj_targets = torch.tensor(subj_targets, device = total_out_target.device) 
         
-        if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
-            if self.hparams.adjust_thresh:
-                # move threshold to maximize balanced accuracy
-                best_bal_acc = 0
-                best_thresh = 0
-                for thresh in np.arange(-5, 5, 0.01):
-                    bal_acc = balanced_accuracy_score(subj_targets.cpu(), (subj_avg_logits>=thresh).int().cpu())
-                    if bal_acc > best_bal_acc:
-                        best_bal_acc = bal_acc
-                        best_thresh = thresh
-                self.log(f"{mode}_best_thresh", best_thresh, sync_dist=True)
-                self.log(f"{mode}_best_balacc", best_bal_acc, sync_dist=True)
-                fpr, tpr, thresholds = roc_curve(subj_targets.cpu(), subj_avg_logits.cpu())
-                idx = np.argmax(tpr - fpr)
-                youden_thresh = thresholds[idx]
-                acc_func = BinaryAccuracy().to(total_out_logits.device)
-                self.log(f"{mode}_youden_thresh", youden_thresh, sync_dist=True)
-                self.log(f"{mode}_youden_balacc", balanced_accuracy_score(subj_targets.cpu(), (subj_avg_logits>=youden_thresh).int().cpu()), sync_dist=True)
 
-                if mode == 'valid':
-                    self.threshold = youden_thresh
-                elif mode == 'test':
-                    bal_acc = balanced_accuracy_score(subj_targets.cpu(), (subj_avg_logits>=self.threshold).int().cpu())
-                    self.log(f"{mode}_balacc_from_valid_thresh", bal_acc, sync_dist=True)
-            else:
-                if self.hparams.num_classes == 2:
-                    acc_func = BinaryAccuracy().to(total_out_logits.device)
-                elif self.hparams.num_classes > 2:
-                    acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
-                    acc3_func = MulticlassAccuracy(num_classes=self.hparams.num_classes, top_k=3).to(total_out_logits.device)
+        if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+            if self.hparams.num_classes == 2:
+                acc_func = BinaryAccuracy().to(total_out_logits.device)
+            elif self.hparams.num_classes > 2:
+                acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
+                acc3_func = MulticlassAccuracy(num_classes=self.hparams.num_classes, top_k=3).to(total_out_logits.device)
 
             if self.hparams.num_classes == 2:
                 auroc_func = BinaryAUROC().to(total_out_logits.device)
@@ -563,8 +553,7 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--gamma", type=float, default=1.0, help="decay for exponential LR scheduler")
         group.add_argument("--cycle", type=float, default=0.3, help="cycle size for CosineAnnealingWarmUpRestarts")
         group.add_argument("--milestones", nargs="+", default=[100, 150], type=int, help="lr scheduler")
-        group.add_argument("--adjust_thresh", action='store_true', help="whether to adjust threshold for valid/test")
-        
+
         # pretraining-related
         group.add_argument("--use_contrastive", action='store_true', help="whether to use contrastive learning (specify --contrastive_type argument as well)")
         group.add_argument("--contrastive_type", default=0, type=int, help="combination of contrastive losses to use [1: Use the Instance contrastive loss function, 2: Use the local-local temporal contrastive loss function, 3: Use the sum of both loss functions]")

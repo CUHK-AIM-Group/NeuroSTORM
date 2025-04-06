@@ -152,7 +152,7 @@ usage: main.py [-h] [--seed SEED] [--dataset_name {HCP1200,ABCD,UKB,Cobre,ADHD20
                [--downstream_task_type DOWNSTREAM_TASK_TYPE] [--task_name TASK_NAME] [--loggername LOGGERNAME] [--project_name PROJECT_NAME] [--resume_ckpt_path RESUME_CKPT_PATH]
                [--load_model_path LOAD_MODEL_PATH] [--test_only] [--test_ckpt_path TEST_CKPT_PATH] [--freeze_feature_extractor] [--print_flops] [--grad_clip] [--optimizer OPTIMIZER]
                [--use_scheduler] [--weight_decay WEIGHT_DECAY] [--learning_rate LEARNING_RATE] [--momentum MOMENTUM] [--gamma GAMMA] [--cycle CYCLE] [--milestones MILESTONES [MILESTONES ...]]
-               [--adjust_thresh] [--use_contrastive] [--contrastive_type CONTRASTIVE_TYPE] [--use_mae] [--spatial_mask SPATIAL_MASK] [--time_mask TIME_MASK] [--mask_ratio MASK_RATIO]
+               [--use_contrastive] [--contrastive_type CONTRASTIVE_TYPE] [--use_mae] [--spatial_mask SPATIAL_MASK] [--time_mask TIME_MASK] [--mask_ratio MASK_RATIO]
                [--pretraining] [--augment_during_training] [--augment_only_affine] [--augment_only_intensity] [--temperature TEMPERATURE] [--model MODEL] [--in_chans IN_CHANS]
                [--num_classes NUM_CLASSES] [--embed_dim EMBED_DIM] [--window_size WINDOW_SIZE [WINDOW_SIZE ...]] [--first_window_size FIRST_WINDOW_SIZE [FIRST_WINDOW_SIZE ...]]
                [--patch_size PATCH_SIZE [PATCH_SIZE ...]] [--depths DEPTHS [DEPTHS ...]] [--num_heads NUM_HEADS [NUM_HEADS ...]] [--c_multiplier C_MULTIPLIER]
@@ -201,7 +201,6 @@ Default classifier:
   --cycle CYCLE         cycle size for CosineAnnealingWarmUpRestarts (default: 0.3)
   --milestones MILESTONES [MILESTONES ...]
                         lr scheduler (default: [100, 150])
-  --adjust_thresh       whether to adjust threshold for valid/test (default: False)
   --use_contrastive     whether to use contrastive learning (specify --contrastive_type argument as well) (default: False)
   --contrastive_type CONTRASTIVE_TYPE
                         combination of contrastive losses to use [1: Use the Instance contrastive loss function, 2: Use the local-local temporal contrastive loss function, 3: Use the sum of

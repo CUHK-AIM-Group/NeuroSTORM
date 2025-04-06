@@ -34,7 +34,7 @@ class BaseDataset(Dataset):
     
     def load_sequence(self, subject_path, start_frame, sample_duration, num_frames=None): 
         if self.contrastive or self.mae:
-            num_frames = len(os.listdir(subject_path)) - 2
+            num_frames = len(os.listdir(subject_path))
             y = []
             load_fnames = [f'frame_{frame}.pt' for frame in range(start_frame, start_frame+sample_duration, self.stride_within_seq)]
             if self.with_voxel_norm:
@@ -157,7 +157,7 @@ class HCP1200(BaseDataset):
         for i, subject in enumerate(subject_dict):
             sex,target = subject_dict[subject]
             subject_path = os.path.join(img_root, subject)
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
@@ -182,7 +182,7 @@ class ABCD(BaseDataset):
             
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -206,7 +206,7 @@ class Cobre(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, subject_name)
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -230,7 +230,7 @@ class ADHD200(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -254,7 +254,7 @@ class UCLA(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -278,7 +278,7 @@ class HCPEP(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -302,7 +302,7 @@ class GOD(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path)) # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -329,7 +329,7 @@ class UKB(BaseDataset):
             
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
@@ -356,7 +356,7 @@ class HCPTASK(BaseDataset):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path)) - 2 # voxel mean & std
+            num_frames = len(os.listdir(subject_path))
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
@@ -368,4 +368,97 @@ class HCPTASK(BaseDataset):
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 
+        return data
+
+
+class UKB(BaseDataset):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_data(self, root, subject_dict):
+        data = []
+        img_root = os.path.join(root, 'img')
+
+        for i, subject_name in enumerate(subject_dict):
+            sex, target = subject_dict[subject_name]
+            # subject_name = subject[4:]
+            
+            subject_path = os.path.join(img_root, subject_name)
+
+            num_frames = len(os.listdir(subject_path))
+            if num_frames < self.stride:
+                import ipdb; ipdb.set_trace()
+            session_duration = num_frames - self.sample_duration + 1
+
+            for start_frame in range(0, session_duration, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, target, sex)
+                data.append(data_tuple)
+
+        if self.train: 
+            self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
+
+        return data
+    
+
+class MOVIE(BaseDataset):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_data(self, root, subject_dict):
+        data = []
+        img_root = os.path.join(root, 'img')
+
+        for i, subject_name in enumerate(subject_dict):
+            sex, target = subject_dict[subject_name]
+            subject_path = os.path.join(img_root, subject_name)
+
+            num_frames = len(os.listdir(subject_path))
+            if num_frames < self.stride:
+                import ipdb; ipdb.set_trace()
+            session_duration = num_frames - self.sample_duration + 1
+
+            for start_frame in range(35, 145-self.stride, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 0, sex)
+                data.append(data_tuple)
+            
+            for start_frame in range(147, 249-self.stride, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 1, sex)
+                data.append(data_tuple)
+            
+            for start_frame in range(252, 362-self.stride, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 2, sex)
+                data.append(data_tuple)
+
+            for start_frame in range(365, 458-self.stride, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 3, sex)
+                data.append(data_tuple)
+            
+            for start_frame in range(461, 529-self.stride, self.stride):
+                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 4, sex)
+                data.append(data_tuple)
+                        
+        if self.train: 
+            self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
+
+        return data
+
+
+class TransDiag(BaseDataset):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_data(self, root, subject_dict):
+        data = []
+        img_root = os.path.join(root, 'img')
+        for i, subject in enumerate(subject_dict):
+            sex,target = subject_dict[subject]
+            subject_path = os.path.join(img_root, subject)
+            num_frames = len(os.listdir(subject_path))
+            session_duration = num_frames - self.sample_duration + 1
+            for start_frame in range(0, session_duration, self.stride):
+                data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
+                data.append(data_tuple)
+
+        if self.train: 
+            self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
         return data

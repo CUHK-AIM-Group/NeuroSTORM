@@ -5,6 +5,8 @@ import time
 from multiprocessing import Process, Queue
 import argparse
 import torch.nn.functional as F
+import numpy as np
+
 
 def select_middle_96(vector):
     start_index, end_index = [], []
@@ -14,7 +16,7 @@ def select_middle_96(vector):
             end_index.append(start_index[-1] + 96)
         else:
             start_index.append(0)
-            end_index.append(-1)
+            end_index.append(vector.shape[i])
 
     if len(vector.shape) == 3:
         result = vector[start_index[0]:end_index[0], start_index[1]:end_index[1], start_index[2]:end_index[2]]
@@ -24,8 +26,8 @@ def select_middle_96(vector):
     return result
 
 def resize_to_96(vector):
-    max_dim = max(vector.shape[:-1])
-    resize_radio = 96 / max_dim
+    min_dim = min(vector.shape[:-1])
+    resize_radio = 96 / min_dim
     new_size = (int(vector.shape[0] * resize_radio), int(vector.shape[1] * resize_radio), int(vector.shape[2] * resize_radio))
 
     if len(vector.shape) == 4:
@@ -40,6 +42,7 @@ def resize_to_96(vector):
     elif len(vector.shape) == 3:
         vector = output_tensor.squeeze()
 
+    vector = select_middle_96(vector)
     return vector
 
 def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue=None, scaling_method=None, fill_zeroback=False):
@@ -58,29 +61,36 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     
     if dataset_name in ['ukb', 'abcd', 'hcp', 'hcpd', 'hcpep', 'hcptask', 'movie']:
         data = select_middle_96(data)
-    elif dataset_name in ['adhd200', 'cobre', 'ucla', 'god']:
+    elif dataset_name in ['adhd200', 'cobre', 'ucla', 'god', 'transdiag']:
         data = resize_to_96(data)
 
-    if dataset_name in ['adhd200', 'god', 'hcp', 'hcpd', 'ukb', 'hcptask', 'movie']:
+    if dataset_name in ['adhd200', 'god', 'hcp', 'hcpd', 'ukb', 'hcptask', 'transdiag']:
         background = data==0
     else:
         if dataset_name in ['abcd', 'cobre', 'hcpep']:
             mask_path = path[:-19] + 'brain_mask.nii.gz'
         elif dataset_name == 'ucla':
             mask_path = path[:-14] + 'brainmask.nii.gz'
+        elif dataset_name == 'movie':
+            mask_path = path[:-4] + '_brainmask.nii.gz'
 
         try:
             background = LoadImage()(mask_path)
         except:
             print('mask open failed')
             return None
-    
-    if dataset_name in ['adhd200', 'cobre', 'ucla', 'god']:
-        background = resize_to_96(data) == 1
 
+        if dataset_name == 'movie':
+            background = background==0
+            background = select_middle_96(background)
+    
+    data[background] = 0
     if scaling_method == 'z-norm':
-        global_mean = data[~background].mean()
-        global_std = data[~background].std()
+        global_mean = data[data>0].mean()
+        if dataset_name == 'movie':
+            global_std = 10
+        else:
+            global_std = data[data>0].std()
         data_temp = (data - global_mean) / global_std
     elif scaling_method == 'minmax':
         data_temp = (data - data[~background].min()) / (data[~background].max() - data[~background].min())
@@ -136,6 +146,7 @@ def main():
                 if args.num_processes == 1:
                     read_data(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method)
                 else:
+                    processes = []
                     p = Process(target=read_data, args=(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method))
                     processes.append(p)
                     p.start()
@@ -172,6 +183,8 @@ def determine_subject_name(dataset_name, filename):
         return filename.split('.')[0]
     elif dataset_name == 'movie':
         return filename.split('.')[0]
+    elif dataset_name == 'transdiag':
+        return filename.split('_task')[0].split('-')[1]
 
 def handle_delete_nii(load_root, save_root, filename, subj_name):
     path = os.path.join(load_root, filename)

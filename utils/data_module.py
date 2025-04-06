@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Subset
-from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD
+from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from .parser import str2bool
 
@@ -69,7 +69,11 @@ class fMRIDataModule(pl.LightningDataModule):
         elif self.hparams.dataset_name == 'GOD':
             return GOD 
         elif self.hparams.dataset_name == 'HCPTASK':
-            return HCPTASK 
+            return HCPTASK
+        elif self.hparams.dataset_name == 'MOVIE':
+            return MOVIE
+        elif self.hparams.dataset_name == 'TransDiag':
+            return TransDiag
         else:
             raise NotImplementedError
 
@@ -108,14 +112,20 @@ class fMRIDataModule(pl.LightningDataModule):
         if self.hparams.downstream_task_type == 'classification':
             S_val = select_elements(S_remaining, S_val)
             S_val_keys = list(S_val.keys())
-            S_test = {k: v for k, v in S_remaining.items() if k not in S_val}
-            S_test_keys = list(S_test.keys())
+            if self.hparams.val_split + self.hparams.train_split < 1:
+                S_test = {k: v for k, v in S_remaining.items() if k not in S_val}
+                S_test_keys = list(S_test.keys())
         else:
             S_val_keys = np.random.choice(remaining_keys, S_val, replace=False)
-            S_test_keys = np.setdiff1d(S_keys, np.concatenate([S_train_keys, S_val_keys]))
-        self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_test_keys})
-
-        return S_train_keys, S_val_keys, S_test_keys
+            if self.hparams.val_split + self.hparams.train_split < 1:
+                S_test_keys = np.setdiff1d(S_keys, np.concatenate([S_train_keys, S_val_keys]))
+        
+        if self.hparams.val_split + self.hparams.train_split < 1:
+            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_test_keys})
+            return S_train_keys, S_val_keys, S_test_keys
+        else:
+            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_val_keys})
+            return S_train_keys, S_val_keys, S_val_keys
     
     def load_split(self):
         subject_order = open(self.split_file_path, "r").readlines()
@@ -196,7 +206,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         target = 1 if target == "M" else 0
                     sex = meta_task[meta_task["subjectkey"]==subject]["sex"].values[0]
                     sex = 1 if sex == "M" else 0
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset ABCD, {} subjects'.format(len(final_dict)))
         
@@ -229,7 +239,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         
                     sex = meta_task[meta_task["subject_id"]==subject]["sex"].values[0]
                     sex = 1 if sex == "male" else 0
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset Cobre, {} subjects'.format(len(final_dict)))
         
@@ -258,7 +268,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         
                     sex = meta_task[meta_task["subject_id"]==int(int(subject))]["Gender"].values[0]
                     sex = int(sex)
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset ADHD200, {} subjects'.format(len(final_dict)))
         
@@ -291,7 +301,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         
                     sex = meta_task[meta_task["subject_id"]==subject]["gender"].values[0]
                     sex = 1 if sex == "M" else 0
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset UCLA, {} subjects'.format(len(final_dict)))
         
@@ -322,7 +332,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         
                     sex = meta_task[meta_task["subject_id"]==int(subject[-4:])]["sex"].values[0]
                     sex = 1 if sex == "M" else 0
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset HCPEP, {} subjects'.format(len(final_dict)))
         
@@ -346,7 +356,7 @@ class fMRIDataModule(pl.LightningDataModule):
                             import ipdb; ipdb.set_trace()
                         
                     sex = 0
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
 
             category_count = defaultdict(int)
             for subject_id, (gender, category) in final_dict.items():
@@ -384,7 +394,7 @@ class fMRIDataModule(pl.LightningDataModule):
                         
                     sex = meta_task[meta_task["subject_id"]==int(subject)]["sex"].values[0]
                     sex = int(sex)
-                    final_dict[subject]=[sex, target]
+                    final_dict[subject] = [sex, target]
             
             print('Load dataset UKB, {} subjects'.format(len(final_dict)))
         
@@ -401,9 +411,80 @@ class fMRIDataModule(pl.LightningDataModule):
                 state = state_to_label[state]
 
                 sex = 0
-                final_dict[subject]=[sex, state]
+                final_dict[subject] = [sex, state]
             
             print('Load dataset HCPTASK, {} subjects'.format(len(final_dict)))
+
+        elif self.hparams.dataset_name == "MOVIE":
+            subject_list = [subj for subj in os.listdir(img_root)]
+
+            if self.hparams.downstream_task_id == 5: task_name = 'classification'
+            else: raise ValueError('downstream task not supported')
+
+            for subject in subject_list:
+                final_dict[subject] = [0, 0]
+            
+            print('Load dataset MOVIE, {} subjects'.format(len(final_dict)))
+        
+        if self.hparams.dataset_name == "TransDiag":
+            subject_list = os.listdir(img_root)
+
+            # anxsi01, bapq01, bis01, bisbas01, cerq01, cgi01, crt01, 
+            csv_file = self.hparams.task_name + '.csv'
+
+            # import chardet
+            # with open(os.path.join(self.hparams.image_path, "metadata", csv_file), 'rb') as file:
+            #     result = chardet.detect(file.read())
+            #     print(result)
+
+            meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", csv_file), encoding='ISO-8859-1')
+            if self.hparams.task_name == 'diagnosis': 
+                task_name = 'diagnosis'
+                # label_name = 'Primary_Dx'
+                label_name = 'Group'
+            else: task_name = 'phenotype'
+
+            print('downstream_task_id = {}, task_name = {}'.format(self.hparams.downstream_task_id, task_name))
+
+            if task_name == 'diagnosis':
+                meta_task = meta_data[['subjectkey', label_name, 'sex']].dropna()
+            elif task_name == 'phenotype':
+                import ipdb; ipdb.set_trace()
+            
+            for subject in subject_list:
+                subject_id = subject[:4] + '_' + subject[4:]
+                if subject_id in meta_task['subjectkey'].values:
+                    sex = meta_task[meta_task["subjectkey"]==subject_id]['sex'].values[0]
+                    if sex == 'F': sex = 0
+                    else: sex = 1
+
+                    if task_name == 'diagnosis':
+                        target = meta_task[meta_task["subjectkey"]==subject_id][label_name].values[0]
+                        if label_name == 'Primary_Dx':
+                            if target == '999': target = 0
+                            elif 'GAD' in target: target = 1
+                            elif 'ADHD' in target: target = 2
+                            elif 'NOS' in target: target = 3
+                            elif 'eating' in target: target = 4
+                            elif 'BP' in target: target = 5
+                            elif 'Dysthymia' in target: target = 6
+                            elif 'MDD' in target: target = 7
+                            elif 'AUD' in target: target = 8
+                            elif 'OCD' in target: target = 9
+                            elif 'panic' in target: target = 10
+                            elif 'anxiety' in target: target = 11
+                            elif 'SZ' in target: target = 12
+                            else:
+                                print(target)
+                                target = 13
+                                import ipdb; ipdb.set_trace()
+                        elif label_name == 'Group':
+                            if target == 'Patient': target = 1
+                            else: target = 0
+                    # print('sex = {}, target = {}'.format(sex, target))
+                    final_dict[subject] = [sex, target]
+            
+            print('Load dataset TransDiag, {} subjects'.format(len(final_dict)))
         
         return final_dict
 
@@ -493,8 +574,8 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--label_scaling_method", default="standardization", choices=["minmax","standardization"], help="label normalization strategy for a regression task (mean and std are automatically calculated using train set)")
         group.add_argument("--image_path", default=None, help="path to image datasets preprocessed for SwiFT")
         group.add_argument("--bad_subj_path", default=None, help="path to txt file that contains subjects with bad fMRI quality")
-        group.add_argument("--train_split", default=0.7, type=float)
-        group.add_argument("--val_split", default=0.15, type=float)
+        group.add_argument("--train_split", default=0.9, type=float)
+        group.add_argument("--val_split", default=0.1, type=float)
         group.add_argument("--batch_size", type=int, default=4)
         group.add_argument("--eval_batch_size", type=int, default=8)
         group.add_argument("--img_size", nargs="+", default=[96, 96, 96, 20], type=int, help="image size (adjust the fourth dimension according to your --sequence_length argument)")
