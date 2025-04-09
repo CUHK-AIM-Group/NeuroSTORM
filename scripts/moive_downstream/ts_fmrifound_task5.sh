@@ -18,7 +18,6 @@ export NCCL_P2P_DISABLE=1
 project_name="movie_ts_fmrifound_task5_train1.0"
 
 python main.py \
-  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
@@ -34,9 +33,9 @@ python main.py \
   --last_layer_full_MSA True \
   --downstream_task_id 5 \
   --downstream_task_type classification \
-  --num_classes 5 \
+  --num_classes 3 \
   --task_name "movie_classification" \
-  --dataset_split_num 4 \
+  --dataset_split_num 5 \
   --seed 1 \
   --learning_rate 1e-3 \
   --model fmrifound \

@@ -1,5 +1,6 @@
-from monai.transforms import LoadImage
+import nibabel as nib
 import torch
+from scipy.ndimage import zoom
 import os
 import time
 from multiprocessing import Process, Queue
@@ -25,72 +26,105 @@ def select_middle_96(vector):
     
     return result
 
-def resize_to_96(vector):
-    min_dim = min(vector.shape[:-1])
-    resize_radio = 96 / min_dim
-    new_size = (int(vector.shape[0] * resize_radio), int(vector.shape[1] * resize_radio), int(vector.shape[2] * resize_radio))
 
-    if len(vector.shape) == 4:
-        vector_permuted = vector.permute(3, 0, 1, 2)
-        vector_unsqueezed = vector_permuted.unsqueeze(0)
-    elif len(vector.shape) == 3:
-        vector_unsqueezed = vector.unsqueeze(0).unsqueeze(0)
-    output_tensor = F.interpolate(vector_unsqueezed, size=new_size, mode='trilinear', align_corners=True)
-    if len(vector.shape) == 4:
-        vector_squeezed = output_tensor.squeeze()
-        vector = vector_squeezed.permute(1, 2, 3, 0)
-    elif len(vector.shape) == 3:
-        vector = output_tensor.squeeze()
+def spatial_resampling(data, header, target_voxel_size=(2, 2, 2)):
+    current_voxel_size = header.get_zooms()[:3]
+    scale_factors = [current / target for current, target in zip(current_voxel_size, target_voxel_size)]
+    new_dims = [int(np.round(dim * scale)) for dim, scale in zip(data.shape[:3], scale_factors)]
+    
+    data = data.astype(np.float32)
+    
+    if data.ndim == 4:
+        data_tensor = torch.from_numpy(data).permute(3, 0, 1, 2).unsqueeze(1)
+    elif data.ndim == 3:
+        data_tensor = torch.from_numpy(data).unsqueeze(0).unsqueeze(0)
+    else:
+        import ipdb; ipdb.set_trace()
+    
+    resampled_tensor = F.interpolate(data_tensor, size=new_dims, mode='trilinear', align_corners=False)
+    
+    if data.ndim == 4:
+        resampled_data = resampled_tensor.squeeze(1).permute(1, 2, 3, 0).numpy()
+    else:
+        resampled_data = resampled_tensor.squeeze(0).squeeze(0).numpy()
+    
+    return resampled_data
 
-    vector = select_middle_96(vector)
-    return vector
+
+def temporal_resampling(data, header, target_time_resolution=0.8):
+    current_time_resolution = header.get_zooms()[3]
+    scale_factor = current_time_resolution / target_time_resolution
+    
+    original_t = data.shape[3]
+    new_t = max(int(np.round(original_t * scale_factor)), 1)
+
+    x, y, z, t = data.shape
+    data_reshaped = data.reshape(-1, t)
+    data_tensor = torch.from_numpy(data_reshaped).unsqueeze(0)
+    
+    resampled_tensor = F.interpolate(data_tensor, size=new_t, mode='linear', align_corners=False)
+    resampled_data = resampled_tensor.squeeze(0).numpy()  # 形状为 (x*y*z, t')
+    resampled_data = resampled_data.reshape(x, y, z, new_t)
+    
+    return resampled_data
+
 
 def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue=None, scaling_method=None, fill_zeroback=False):
     print("processing: " + filename, flush=True)
     path = os.path.join(load_root, filename)
     try:
-        data = LoadImage()(path)
+        img = nib.load(path)
+        data = img.get_fdata()
+        header = img.header
     except:
         print('{} open failed'.format(path))
-        return None
-    
+        import ipdb; ipdb.set_trace()
+        # return None
+
     save_dir = os.path.join(save_root, subj_name)
     isExist = os.path.exists(save_dir)
     if not isExist:
         os.makedirs(save_dir)
-    
-    if dataset_name in ['ukb', 'abcd', 'hcp', 'hcpd', 'hcpep', 'hcptask', 'movie']:
-        data = select_middle_96(data)
-    elif dataset_name in ['adhd200', 'cobre', 'ucla', 'god', 'transdiag']:
-        data = resize_to_96(data)
 
-    if dataset_name in ['adhd200', 'god', 'hcp', 'hcpd', 'ukb', 'hcptask', 'transdiag']:
+    # resampling to fixed spatial and temporal resolution
+    data = spatial_resampling(data, header)
+    data = temporal_resampling(data, header)
+    data = select_middle_96(data)
+
+    # load brain mask
+    if dataset_name in ['hcp', 'hcpd', 'ukb', 'hcptask']:
         background = data==0
     else:
         if dataset_name in ['abcd', 'cobre', 'hcpep']:
             mask_path = path[:-19] + 'brain_mask.nii.gz'
+        elif dataset_name == 'movie':
+            mask_path = path[:-57] + 'space-MNI152NLin2009cAsym_desc-brain_mask.nii.gz'
+        elif dataset_name == 'transdiag':
+            mask_path = path[:-19] + 'brainmask.nii.gz'
         elif dataset_name == 'ucla':
             mask_path = path[:-14] + 'brainmask.nii.gz'
-        elif dataset_name == 'movie':
-            mask_path = path[:-4] + '_brainmask.nii.gz'
 
         try:
-            background = LoadImage()(mask_path)
+            mask = nib.load(mask_path)
+            background = mask.get_fdata()
+            mask_header = mask.header
         except:
-            print('mask open failed')
-            return None
+            print('mask open failed. {}'.format(mask_path))
+            import ipdb; ipdb.set_trace()
+            # return None
 
-        if dataset_name == 'movie':
-            background = background==0
-            background = select_middle_96(background)
-    
+        background = spatial_resampling(background, mask_header)
+        background = select_middle_96(background)
+        background = background==0
+
     data[background] = 0
+    data[data<0] = 0
+    data = torch.Tensor(data)
+
+    # normalization
     if scaling_method == 'z-norm':
-        global_mean = data[data>0].mean()
-        if dataset_name == 'movie':
-            global_std = 10
-        else:
-            global_std = data[data>0].std()
+        global_mean = data[~background].mean()
+        global_std = data[~background].std()
         data_temp = (data - global_mean) / global_std
     elif scaling_method == 'minmax':
         data_temp = (data - data[~background].min()) / (data[~background].max() - data[~background].min())
@@ -133,7 +167,7 @@ def main():
     count = 0
 
     for filename in sorted(filenames):
-        if not (filename.endswith('.nii.gz') or filename.endswith('.nii')) or 'mask' in filename or 'imagery' in filename:
+        if not (filename.endswith('.nii.gz') or filename.endswith('.nii')) or 'mask' in filename or 'imagery' in filename or 'task-REST_acq-PAEP2D' in filename:
             continue
 
         # Determine subject name based on dataset
@@ -182,9 +216,9 @@ def determine_subject_name(dataset_name, filename):
     elif dataset_name == 'hcptask':
         return filename.split('.')[0]
     elif dataset_name == 'movie':
-        return filename.split('.')[0]
+        return filename.split('_acq-PAEP2D')[0]
     elif dataset_name == 'transdiag':
-        return filename.split('_task')[0].split('-')[1]
+        return filename.split('_task-testPA')[0].split('-')[1]
 
 def handle_delete_nii(load_root, save_root, filename, subj_name):
     path = os.path.join(load_root, filename)

@@ -19,7 +19,6 @@ project_name="transdiag_ts_fmrifound_task3_dx_train1.0"
 
 
 python main.py \
-  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \

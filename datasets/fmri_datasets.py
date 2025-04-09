@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, IterableDataset
 import numpy as np
 import random
 import math
+import pandas as pd
 
 
 def pad_to_96(y):
@@ -404,39 +405,46 @@ class MOVIE(BaseDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    def process_tsv(self, path):
+        df = pd.read_csv(path, sep='\t')
+        result = []
+        for _, row in df.iterrows():
+            if row['trial_type'] == 'High_cal_food':
+                label = 0
+            elif row['trial_type'] == 'Low_cal_food':
+                label = 1
+            else:
+                label = 2
+            entry = {
+                'start': int(row['onset'] / 0.8),
+                'end': int((row['onset'] + row['duration']) / 0.8) + 10,
+                'label': label
+            }
+            result.append(entry)
+
+        return result
+
     def _set_data(self, root, subject_dict):
         data = []
         img_root = os.path.join(root, 'img')
+        label_root = os.path.join(root, 'metadata')
 
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, subject_name)
+            label_path = os.path.join(label_root, '{}-food_events.tsv'.format(subject_name[:-5]))
+            label = self.process_tsv(label_path)
 
             num_frames = len(os.listdir(subject_path))
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
 
-            for start_frame in range(35, 145-self.stride, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 0, sex)
-                data.append(data_tuple)
+            for j in range(len(label)):
+                for start_frame in range(label[j]['start'], label[j]['end'], self.stride):
+                    data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, label[j]['label'], sex)
+                    data.append(data_tuple)
             
-            for start_frame in range(147, 249-self.stride, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 1, sex)
-                data.append(data_tuple)
-            
-            for start_frame in range(252, 362-self.stride, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 2, sex)
-                data.append(data_tuple)
-
-            for start_frame in range(365, 458-self.stride, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 3, sex)
-                data.append(data_tuple)
-            
-            for start_frame in range(461, 529-self.stride, self.stride):
-                data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, 4, sex)
-                data.append(data_tuple)
-                        
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
 

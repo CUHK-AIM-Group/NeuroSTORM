@@ -42,7 +42,7 @@ conda activate fmrifound
 
 # upgrade gcc compiler (optional)
 conda install gcc_impl_linux-64=11.2.0
-ln -s /your/path/to/anaconda3/envs/fmrifound/libexec/gcc/x86_64-conda-linux-gnu/11.2.0/gcc /your/path/to/anaconda3/envs/fmrifound/bin/gcc
+ln -s /path/to/anaconda3/envs/fmrifound/libexec/gcc/x86_64-conda-linux-gnu/11.2.0/gcc /path/to/anaconda3/envs/fmrifound/bin/gcc
 conda install gxx_linux-64=11.2.0
 conda install ninja
 
@@ -102,13 +102,23 @@ Our directory structure looks like this:
 
 ### 3.1 Pre-processing
 
-We provide a tool for batch preprocessing of fMRI volumes. Please make sure your data have been aligned into MNI152 space. With this tool, you can preprocess all supported datasets in bulk, including background removal, resizing (via interpolation algorithms or by discarding certain slices), Z-normalization, and saving each frame as a .pt file. If your CPU computational power is limited, we recommend preprocessing all datasets. If your training bottleneck lies in disk read speed, you can skip this step and process the data online during training.
+First, please ensure that you have applied a primary processing pipeline, such as [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs), [fMRIPrep](https://fmriprep.org/en/stable/), or [HCP pipeline](https://github.com/Washington-University/HCPpipelines), and that your data has been aligned into MNI152 space. You can also use our provided shell script for brain extraction. It is based on FSL BET， so you need install [FSL tool](https://fsl.fmrib.ox.ac.uk/fsl/docs). After running the script, brain mask files in the nii.gz format will be generated in the output directory.
+
+
+```bash
+cd fMRIFound/datasets
+bash brain_extraction.sh /path/to/your/dataset /path/to/output/dataset
+```
+
+
+After that, we provide a tool to prepare your data for model input. With this tool, you can preprocess all supported datasets in bulk, which includes background removal, resampling to fixed spatial and temporal resolution (via interpolation algorithms or by discarding certain slices), Z-normalization, and saving each frame as a .pt file. If your CPU computational power is limited, we recommend preprocessing all datasets in advance. However, if your training bottleneck lies in disk read speed, you may choose to skip this step and process the data online during training.
+
 
 Here is an example of pre-processing HCP-YA dataset:
 
 ```bash
 cd fMRIFound/datasets
-python preprocessing_volume.py --dataset_name hcp --load_root ./data/hcp --save_root ./processed_data/hcp --num_processes 32
+python preprocessing_volume.py --dataset_name hcp --load_root ./data/hcp --save_root ./processed_data/hcp --num_processes 8
 ```
 
 We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. If you need to delete the original files to free up disk space, you can use `--delete_after_preprocess`, and the tool will delete the original data after processing each sequence. If you didn't delete them during runtime, you can run the tool again and use `--delete_nii`. The tool will check if preprocessed files exist in the output folder and then delete the original files.
@@ -310,7 +320,6 @@ export NCCL_P2P_DISABLE=1
 project_name="hcp_ts_fmrifound_task1_${task_name}_train1.0"
 
 python main.py \
-  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \

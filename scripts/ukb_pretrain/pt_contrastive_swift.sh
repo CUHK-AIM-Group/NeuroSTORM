@@ -15,7 +15,6 @@ export NCCL_P2P_DISABLE=1
 project_name="ukb_pt_swift_mae0.5"
 
 python main.py \
-  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
