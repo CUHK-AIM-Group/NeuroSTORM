@@ -413,8 +413,10 @@ class MOVIE(BaseDataset):
                 label = 0
             elif row['trial_type'] == 'Low_cal_food':
                 label = 1
-            else:
+            elif row['trial_type'] == 'non-food':
                 label = 2
+            else:
+                import ipdb; ipdb.set_trace()
             entry = {
                 'start': int(row['onset'] / 0.8),
                 'end': int((row['onset'] + row['duration']) / 0.8) + 10,
@@ -422,28 +424,43 @@ class MOVIE(BaseDataset):
             }
             result.append(entry)
 
+        result[-1]['end'] -= 10
+
         return result
 
     def _set_data(self, root, subject_dict):
         data = []
         img_root = os.path.join(root, 'img')
-        label_root = os.path.join(root, 'metadata')
 
-        for i, subject_name in enumerate(subject_dict):
-            sex, target = subject_dict[subject_name]
-            subject_path = os.path.join(img_root, subject_name)
-            label_path = os.path.join(label_root, '{}-food_events.tsv'.format(subject_name[:-5]))
-            label = self.process_tsv(label_path)
-
+        for i, subject in enumerate(subject_dict):
+            sex, target = subject_dict[subject]
+            subject_path = os.path.join(img_root, subject)
             num_frames = len(os.listdir(subject_path))
-            if num_frames < self.stride:
-                import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
+            for start_frame in range(0, session_duration, self.stride):
+                data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
+                data.append(data_tuple)
 
-            for j in range(len(label)):
-                for start_frame in range(label[j]['start'], label[j]['end'], self.stride):
-                    data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, label[j]['label'], sex)
-                    data.append(data_tuple)
+        # label_root = os.path.join(root, 'metadata')
+
+        # for i, subject_name in enumerate(subject_dict):
+        #     sex, target = subject_dict[subject_name]
+        #     subject_path = os.path.join(img_root, subject_name)
+        #     label_path = os.path.join(label_root, '{}-food_events.tsv'.format(subject_name[:-5]))
+        #     label = self.process_tsv(label_path)
+
+        #     num_frames = len(os.listdir(subject_path))
+        #     if num_frames < self.stride:
+        #         import ipdb; ipdb.set_trace()
+        #     session_duration = num_frames - self.sample_duration + 1
+
+        #     for j in range(len(label)):
+        #         for start_frame in range(label[j]['start'], label[j]['end'], self.stride):
+        #             if start_frame + self.stride >= num_frames:
+        #                 continue
+
+        #             data_tuple = (i, subject_name, subject_path, start_frame, self.stride, num_frames, label[j]['label'], sex)
+        #             data.append(data_tuple)
             
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
@@ -458,8 +475,9 @@ class TransDiag(BaseDataset):
     def _set_data(self, root, subject_dict):
         data = []
         img_root = os.path.join(root, 'img')
+
         for i, subject in enumerate(subject_dict):
-            sex,target = subject_dict[subject]
+            sex, target = subject_dict[subject]
             subject_path = os.path.join(img_root, subject)
             num_frames = len(os.listdir(subject_path))
             session_duration = num_frames - self.sample_duration + 1
@@ -469,4 +487,5 @@ class TransDiag(BaseDataset):
 
         if self.train: 
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
+        
         return data

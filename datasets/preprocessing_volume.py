@@ -63,7 +63,7 @@ def temporal_resampling(data, header, target_time_resolution=0.8):
     data_tensor = torch.from_numpy(data_reshaped).unsqueeze(0)
     
     resampled_tensor = F.interpolate(data_tensor, size=new_t, mode='linear', align_corners=False)
-    resampled_data = resampled_tensor.squeeze(0).numpy()  # 形状为 (x*y*z, t')
+    resampled_data = resampled_tensor.squeeze(0).numpy()
     resampled_data = resampled_data.reshape(x, y, z, new_t)
     
     return resampled_data
@@ -73,9 +73,7 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     print("processing: " + filename, flush=True)
     path = os.path.join(load_root, filename)
     try:
-        img = nib.load(path)
-        data = img.get_fdata()
-        header = img.header
+        img = nib.load(path); data = img.get_fdata(); header = img.header
     except:
         print('{} open failed'.format(path))
         import ipdb; ipdb.set_trace()
@@ -92,7 +90,7 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     data = select_middle_96(data)
 
     # load brain mask
-    if dataset_name in ['hcp', 'hcpd', 'ukb', 'hcptask']:
+    if dataset_name in ['hcpya', 'hcpa', 'hcpd', 'ukb', 'hcptask']:
         background = data==0
     else:
         if dataset_name in ['abcd', 'cobre', 'hcpep']:
@@ -167,7 +165,7 @@ def main():
     count = 0
 
     for filename in sorted(filenames):
-        if not (filename.endswith('.nii.gz') or filename.endswith('.nii')) or 'mask' in filename or 'imagery' in filename or 'task-REST_acq-PAEP2D' in filename:
+        if not (filename.endswith('.nii.gz') or filename.endswith('.nii')) or 'mask' in filename or 'imagery' in filename or 'task-REST_acq' in filename:
             continue
 
         # Determine subject name based on dataset
@@ -190,10 +188,6 @@ def main():
                         processes = []
             except Exception as e:
                 print(f'encountered problem with {filename}: {e}')
-        
-        # if args.num_processes > 1:
-        #     for p in processes:
-        #         p.join()
 
 
 def determine_subject_name(dataset_name, filename):
@@ -203,9 +197,9 @@ def determine_subject_name(dataset_name, filename):
         return filename.split('_')[2]
     elif dataset_name == 'god':
         return filename[:6] + '_' + filename.split('perception_')[1][:6]
-    elif dataset_name == 'hcp':
+    elif dataset_name == 'hcpya':
         return filename[:-7]
-    elif dataset_name == 'hcpd':
+    elif dataset_name in ['hcpd', 'hcpa']:
         return filename[:10]
     elif dataset_name == 'hcpep':
         return filename[:8]
@@ -216,7 +210,7 @@ def determine_subject_name(dataset_name, filename):
     elif dataset_name == 'hcptask':
         return filename.split('.')[0]
     elif dataset_name == 'movie':
-        return filename.split('_acq-PAEP2D')[0]
+        return filename.split('_acq')[0]
     elif dataset_name == 'transdiag':
         return filename.split('_task-testPA')[0].split('-')[1]
 

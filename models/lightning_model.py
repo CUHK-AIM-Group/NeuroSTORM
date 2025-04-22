@@ -78,7 +78,6 @@ class LightningModel(pl.LightningModule):
         return self.output_head(self.model(x))
     
     def augment(self, img):
-
         B, C, H, W, D, T = img.shape
 
         device = img.device
@@ -125,7 +124,6 @@ class LightningModel(pl.LightningModule):
         if type(feature) == tuple:
             feature = feature[0]
 
-        import ipdb; ipdb.set_trace()
         # Classification task
         if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             logits = self.output_head(feature).squeeze() #self.clf(feature).squeeze()
@@ -228,7 +226,7 @@ class LightningModel(pl.LightningModule):
             # print(f"Data time: {data_time:.6f} seconds")
 
             start_time_model = time.time()
-            subj, logits, target = self._compute_logits(batch, augment_during_training = self.hparams.augment_during_training)
+            subj, logits, target = self._compute_logits(batch, augment_during_training=self.hparams.augment_during_training)
             end_time_model = time.time()
             model_time = end_time_model - start_time_model
             # print(f"Model time: {model_time:.6f} seconds")
@@ -265,6 +263,8 @@ class LightningModel(pl.LightningModule):
         
         subj_avg_logits = []
         subj_targets = []
+        # if mode == 'test':
+        #     import ipdb; ipdb.set_trace()
 
         if self.hparams.task_name == 'movie_classification':
             acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
@@ -278,7 +278,6 @@ class LightningModel(pl.LightningModule):
             self.log(f"{mode}_acc", acc, sync_dist=True)
             self.log(f"{mode}_acc3", acc3, sync_dist=True)
             # self.log(f"{mode}_AUROC", auroc, sync_dist=True)
-
             return
 
         if self.hparams.num_classes == 2:
@@ -295,7 +294,6 @@ class LightningModel(pl.LightningModule):
                 subj_targets.append(total_out_target[subj_array == subj][0].item())
             subj_avg_logits = torch.stack(subj_avg_logits) 
             subj_targets = torch.tensor(subj_targets, device = total_out_target.device) 
-        
 
         if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             if self.hparams.num_classes == 2:
@@ -307,19 +305,19 @@ class LightningModel(pl.LightningModule):
             if self.hparams.num_classes == 2:
                 auroc_func = BinaryAUROC().to(total_out_logits.device)
                 acc = acc_func((subj_avg_logits >= 0).int(), subj_targets)
-                bal_acc_sk = balanced_accuracy_score(subj_targets.cpu(), (subj_avg_logits>=0).int().cpu())
+                # bal_acc_sk = balanced_accuracy_score(subj_targets.cpu(), (subj_avg_logits>=0).int().cpu())
                 auroc = auroc_func(torch.sigmoid(subj_avg_logits), subj_targets)
             elif self.hparams.num_classes > 2:
                 auroc_func = MulticlassAUROC(num_classes=self.hparams.num_classes).to(total_out_logits.device)
                 acc = acc_func(subj_avg_logits, subj_targets.long())
                 acc3 = acc3_func(subj_avg_logits, subj_targets.long())
-                bal_acc_sk = balanced_accuracy_score(subj_targets.cpu(), subj_avg_logits.max(dim=1)[1].int().cpu())
+                # bal_acc_sk = balanced_accuracy_score(subj_targets.cpu(), subj_avg_logits.max(dim=1)[1].int().cpu())
                 auroc = auroc_func(subj_avg_logits, subj_targets.long())
 
                 self.log(f"{mode}_acc3", acc3, sync_dist=True)
 
             self.log(f"{mode}_acc", acc, sync_dist=True)
-            self.log(f"{mode}_balacc", bal_acc_sk, sync_dist=True)
+            # self.log(f"{mode}_balacc", bal_acc_sk, sync_dist=True)
             self.log(f"{mode}_AUROC", auroc, sync_dist=True)
 
         # regression target is normalized
@@ -404,14 +402,14 @@ class LightningModel(pl.LightningModule):
                 self.subject_accuracy[subj] = {'score': [score], 'mode':mode, 'truth':output[1], 'count':1}
             else:
                 self.subject_accuracy[subj]['score'].append(score)
-                self.subject_accuracy[subj]['count']+=1
+                self.subject_accuracy[subj]['count'] += 1
         
         if self.hparams.strategy == None: 
             pass
         elif 'ddp' in self.hparams.strategy and len(self.subject_accuracy) > 0:
             world_size = torch.distributed.get_world_size()
             total_subj_accuracy = [None for _ in range(world_size)]
-            torch.distributed.all_gather_object(total_subj_accuracy,self.subject_accuracy) # gather and broadcast to whole ranks     
+            torch.distributed.all_gather_object(total_subj_accuracy, self.subject_accuracy) # gather and broadcast to whole ranks     
             accuracy_dict = {}
             for dct in total_subj_accuracy:
                 for subj, metric_dict in dct.items():

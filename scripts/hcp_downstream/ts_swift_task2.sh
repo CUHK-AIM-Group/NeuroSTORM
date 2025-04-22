@@ -21,6 +21,7 @@ export NCCL_P2P_DISABLE=1
 project_name="hcp_ts_swift_task2_${score_name}_train1.0"
 
 python main.py \
+  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \

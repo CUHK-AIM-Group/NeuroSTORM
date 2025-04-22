@@ -8,6 +8,7 @@ class cls_head_v1(nn.Module):
         num_outputs = 1 if num_classes == 2 else num_classes
         self.head = nn.Linear(num_tokens, num_outputs)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self.norm = nn.LayerNorm(num_tokens)
 
     def forward(self, x):
         # x -> (b, 96, 4, 4, 4, t)

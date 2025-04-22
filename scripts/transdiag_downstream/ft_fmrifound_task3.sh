@@ -19,13 +19,14 @@ project_name="transdiag_ft_fmrifound_task3_dx_train1.0"
 
 
 python main.py \
+  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
   --loggername tensorboard \
   --clf_head_version v1 \
   --dataset_name TransDiag \
-  --image_path ./data/TRANSDIAG_preprocessed \
+  --image_path ./data/TRANS_preprocessed \
   --batch_size "$batch_size" \
   --num_workers "$batch_size" \
   --project_name "$project_name" \
@@ -36,7 +37,7 @@ python main.py \
   --downstream_task_type "classification" \
   --num_classes 2 \
   --task_name "diagnosis" \
-  --dataset_split_num 2 \
+  --dataset_split_num  \
   --seed 1 \
   --learning_rate 5e-5 \
   --model fmrifound \

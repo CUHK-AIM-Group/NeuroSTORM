@@ -11,15 +11,17 @@ if [ ! -z "$2" ]; then
   batch_size=$2
 fi
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1
 export NCCL_P2P_DISABLE=1
+export MASTER_PORT=29500
 
 # Construct project_name using score_name
 project_name="movie_ts_fmrifound_task5_train1.0"
 
 python main.py \
+  --accelerator gpu \
   --max_epochs 30 \
-  --num_nodes 1 \
+  --num_nodes 2 \
   --strategy ddp \
   --loggername tensorboard \
   --clf_head_version v1 \
@@ -33,9 +35,9 @@ python main.py \
   --last_layer_full_MSA True \
   --downstream_task_id 5 \
   --downstream_task_type classification \
-  --num_classes 3 \
-  --task_name "movie_classification" \
-  --dataset_split_num 5 \
+  --num_classes 2 \
+  --task_name "diagnosis" \
+  --dataset_split_num 2 \
   --seed 1 \
   --learning_rate 1e-3 \
   --model fmrifound \
@@ -44,4 +46,5 @@ python main.py \
   --sequence_length 40 \
   --img_size 96 96 96 40 \
   --first_window_size 4 4 4 4 \
-  --window_size 4 4 4 4
+  --window_size 4 4 4 4 \
+  --train_split 0.8 --val_split 0.2

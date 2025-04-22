@@ -417,20 +417,39 @@ class fMRIDataModule(pl.LightningDataModule):
 
         elif self.hparams.dataset_name == "MOVIE":
             subject_list = [subj for subj in os.listdir(img_root)]
+            parent_dir = os.path.dirname(os.path.abspath(img_root))
+            metadata_dir = os.path.join(parent_dir, 'metadata')
+            participants_file = os.path.join(metadata_dir, 'participants.tsv')
+
+            try:
+                df = pd.read_csv(participants_file, sep='\t')
+            except Exception as e:
+                import ipdb; ipdb.set_trace()
+
+            participant_id = df.iloc[:, 0]
+            group = df.iloc[:, -1]
+            participant_dict = pd.Series(group.values, index=participant_id).to_dict()
 
             if self.hparams.downstream_task_id == 5: task_name = 'classification'
             else: raise ValueError('downstream task not supported')
 
             for subject in subject_list:
-                final_dict[subject] = [0, 0]
+                subject_id = subject.split('_')[0]
+                if participant_dict[subject_id] == 'Control':
+                    final_dict[subject] = [0, 0]
+                else:
+                    final_dict[subject] = [0, 1]
             
             print('Load dataset MOVIE, {} subjects'.format(len(final_dict)))
         
         if self.hparams.dataset_name == "TransDiag":
             subject_list = os.listdir(img_root)
 
-            # anxsi01, bapq01, bis01, bisbas01, cerq01, cgi01, crt01, 
-            csv_file = self.hparams.task_name + '.csv'
+            # diagnosis, clinical_variables
+            if self.hparams.task_name == 'diagnosis': 
+                csv_file = self.hparams.task_name + '.csv'
+            else:
+                csv_file = 'clinical_variables.csv'
 
             # import chardet
             # with open(os.path.join(self.hparams.image_path, "metadata", csv_file), 'rb') as file:
@@ -440,52 +459,50 @@ class fMRIDataModule(pl.LightningDataModule):
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", csv_file), encoding='ISO-8859-1')
             if self.hparams.task_name == 'diagnosis': 
                 task_name = 'diagnosis'
-                # label_name = 'Primary_Dx'
-                label_name = 'Group'
-            else: task_name = 'phenotype'
+                # label_name = 'Group'
+                label_name = 'Diagnostic_Category_Code'
+            else: task_name = 'clinical_variables'
 
             print('downstream_task_id = {}, task_name = {}'.format(self.hparams.downstream_task_id, task_name))
+            target_counts = defaultdict(int)
 
             if task_name == 'diagnosis':
                 meta_task = meta_data[['subjectkey', label_name, 'sex']].dropna()
-            elif task_name == 'phenotype':
-                import ipdb; ipdb.set_trace()
+            elif task_name == 'clinical_variables':
+                label_name = self.hparams.task_name
+                meta_task = meta_data[['subjectkey', label_name]].dropna()
             
             for subject in subject_list:
-                subject_id = subject[:4] + '_' + subject[4:]
+                subject_id = subject[:4] + '_' + subject[4:-5]
                 if subject_id in meta_task['subjectkey'].values:
-                    sex = meta_task[meta_task["subjectkey"]==subject_id]['sex'].values[0]
-                    if sex == 'F': sex = 0
-                    else: sex = 1
-
                     if task_name == 'diagnosis':
+                        sex = meta_task[meta_task["subjectkey"]==subject_id]['sex'].values[0]
+                        if sex == 'F': sex = 0
+                        else: sex = 1
+
                         target = meta_task[meta_task["subjectkey"]==subject_id][label_name].values[0]
-                        if label_name == 'Primary_Dx':
-                            if target == '999': target = 0
-                            elif 'GAD' in target: target = 1
-                            elif 'ADHD' in target: target = 2
-                            elif 'NOS' in target: target = 3
-                            elif 'eating' in target: target = 4
-                            elif 'BP' in target: target = 5
-                            elif 'Dysthymia' in target: target = 6
-                            elif 'MDD' in target: target = 7
-                            elif 'AUD' in target: target = 8
-                            elif 'OCD' in target: target = 9
-                            elif 'panic' in target: target = 10
-                            elif 'anxiety' in target: target = 11
-                            elif 'SZ' in target: target = 12
-                            else:
-                                print(target)
-                                target = 13
-                                import ipdb; ipdb.set_trace()
+                        if label_name == 'Diagnostic_Category_Code':
+                            if target in [0, 5, 7]: continue
+                            elif target == 8: target = 0
+                            elif target == 6: target = 5
                         elif label_name == 'Group':
                             if target == 'Patient': target = 1
                             else: target = 0
+                    else:
+                        sex = 0
+                        target = meta_task[meta_task["subjectkey"]==subject_id][label_name].values[0]
+                        if target == 'n/a':
+                            import ipdb; ipdb.set_trace()
+                            continue
+                    
+                    target_counts[target] += 1
                     # print('sex = {}, target = {}'.format(sex, target))
                     final_dict[subject] = [sex, target]
             
+            for category, count in target_counts.items():
+                print(f"Target {category}: {count}")
             print('Load dataset TransDiag, {} subjects'.format(len(final_dict)))
-        
+
         return final_dict
 
     def setup(self, stage=None):

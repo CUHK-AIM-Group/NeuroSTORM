@@ -26,13 +26,13 @@ def cli_main():
     parser.add_argument("--task_name", type=str, default="sex", help="specify the task name")
     parser.add_argument("--loggername", default="default", type=str, help="A name of logger")
     parser.add_argument("--project_name", default="default", type=str, help="A name of project")
+    parser.add_argument("--auto_resume", action='store_true', help="Whether to find the last checkpoint and resume the training")
     parser.add_argument("--resume_ckpt_path", type=str, help="A path to previous checkpoint. Use when you want to continue the training from the previous checkpoints")
     parser.add_argument("--load_model_path", type=str, help="A path to the pre-trained model weight file (.pth)")
     parser.add_argument("--test_only", action='store_true', help="specify when you want to test the checkpoints (model weights)")
     parser.add_argument("--test_ckpt_path", type=str, help="A path to the previous checkpoint that intends to evaluate (--test_only should be True)")
     parser.add_argument("--freeze_feature_extractor", action='store_true', help="Whether to freeze the feature extractor (for evaluating the pre-trained weight)")
     parser.add_argument("--print_flops", action='store_true', help="Whether to print the number of FLOPs")
-    temp_args, _ = parser.parse_known_args()
 
     # Set dataset
     Dataset = fMRIDataModule
@@ -52,10 +52,24 @@ def cli_main():
     project_name = args.project_name
     image_path = args.image_path
 
-    if temp_args.resume_ckpt_path is not None:
+    if args.model == "fmrifound":
+        category_dir = "fmrifound"
+    elif args.model in ["swift", "tff"]:
+        category_dir = "volume-based"
+    elif args.model in ["braingnn", "bnt"]:
+        category_dir = "roi-based"
+    setattr(args, "default_root_dir", os.path.join('output', category_dir, args.project_name))
+
+    resume_ckpt_path = None if args.resume_ckpt_path is None else args.resume_ckpt_path
+    if args.resume_ckpt_path is None and args.auto_resume:
+        resume_ckpt_path = os.path.join('output', category_dir, args.project_name, 'last.ckpt')
+    setattr(args, "resume_ckpt_path", resume_ckpt_path)
+    import ipdb; ipdb.set_trace()
+
+    if args.resume_ckpt_path is not None:
         # resume previous experiment
         from utils.neptune_utils import get_prev_args
-        args = get_prev_args(args.resume_ckpt_path, args)
+        args = get_prev_args(resume_ckpt_path, args)
         exp_id = None
         # override max_epochs if you hope to prolong the training
         args.project_name = project_name
@@ -65,14 +79,6 @@ def cli_main():
         args.image_path = image_path       
     else:
         exp_id = None
-    
-    if args.model == "fmrifound":
-        category_dir = "fmrifound"
-    elif args.model in ["swift", "tff"]:
-        category_dir = "volume-based"
-    elif args.model in ["braingnn", "bnt"]:
-        category_dir = "roi-based"
-    setattr(args, "default_root_dir", f"output/{category_dir}/{args.project_name}")
 
     # ------------ data -------------
     data_module = Dataset(**vars(args))

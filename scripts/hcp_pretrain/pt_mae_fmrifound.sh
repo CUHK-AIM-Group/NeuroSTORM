@@ -8,13 +8,14 @@ if [ ! -z "$1" ]; then
 fi
 
 # We will use all aviailable GPUs, and automatically set the same batch size for each GPU
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name
 project_name="hcp_pt_fmrifound_mae0.5"
 
 python main.py \
+  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
@@ -42,4 +43,5 @@ python main.py \
   --sequence_length 40 \
   --img_size 96 96 96 40 \
   --first_window_size 4 4 4 4 \
-  --window_size 4 4 4 4
+  --window_size 4 4 4 4 \
+  --auto_resume

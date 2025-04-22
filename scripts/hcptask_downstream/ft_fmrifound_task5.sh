@@ -18,6 +18,7 @@ export NCCL_P2P_DISABLE=1
 project_name="hcp_ft_fmrifound_task5_train1.0"
 
 python main.py \
+  --accelerator gpu \
   --max_epochs 30 \
   --num_nodes 1 \
   --strategy ddp \
