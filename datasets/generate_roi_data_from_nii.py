@@ -54,8 +54,13 @@ def process_single_fmri_file(args):
     if all_exist:
         return
 
-    fmri_data = nib.load(fmri_file).get_fdata()
-    num_frames = fmri_data.shape[-1]
+    try:
+        fmri_data = nib.load(fmri_file).get_fdata()
+        num_frames = fmri_data.shape[-1]
+    except:
+        print("Failed to load fMRI data: {}".format(fmri_file))
+        import ipdb; ipdb.set_trace()
+        return
 
     for atlas_name, atlas_data in atlases.items():
         if exist_dict[atlas_name]:
