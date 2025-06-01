@@ -23,8 +23,19 @@
   <meta name="keywords" content="KEYWORDS SHOULD BE PLACED HERE">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
+  <style>
+    .content a {
+      color: #1e90ff;   /* 你可以换成你喜欢的颜色，如 #e67e22, #007bff 等 */
+      text-decoration: underline;
+      transition: color 0.2s;
+    }
+    .content a:hover {
+      color: #ff6600;   /* 鼠标悬停时的颜色 */
+    }
+  </style>
+  
   <title>Academic Project Page</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
   <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
   rel="stylesheet">
@@ -52,50 +63,49 @@
       <div class="container is-max-desktop">
         <div class="columns is-centered">
           <div class="column has-text-centered">
-            <h1 class="title is-1 publication-title">Academic Project Page</h1>
+            <h1 class="title is-1 publication-title">NeuroSTORM: Towards a general-purpose foundation model for fMRI analysis</h1>
             <div class="is-size-5 publication-authors">
-              <!-- Paper authors -->
-              <span class="author-block">
-                <a href="FIRST AUTHOR PERSONAL LINK" target="_blank">First Author</a><sup>*</sup>,</span>
-                <span class="author-block">
-                  <a href="SECOND AUTHOR PERSONAL LINK" target="_blank">Second Author</a><sup>*</sup>,</span>
-                  <span class="author-block">
-                    <a href="THIRD AUTHOR PERSONAL LINK" target="_blank">Third Author</a>
-                  </span>
-                  </div>
+                  <!-- Paper authors -->
+                  <span class="author-block">Cheng Wang<sup>1</sup>,</span>
+                  <span class="author-block">Yu Jiang<sup>1</sup>,</span>
+                  <span class="author-block">Zhihao Peng<sup>1</sup>,</span>
+                  <span class="author-block">Chenxin Li<sup>1</sup>,</span>
+                  <span class="author-block">Changbae Bang<sup>2</sup>,</span>
+                  <span class="author-block">Lin Zhao<sup>3</sup>,</span>
+                  <span class="author-block">Jinglei Lv<sup>4</sup>,</span>
+                  <span class="author-block">Jorge Sepulcre<sup>5</sup>,</span>
+                  <span class="author-block">Carl Yang<sup>6</sup>,</span>
+                  <span class="author-block">Lifang He<sup>7</sup>,</span>
+                  <span class="author-block">Tianming Liu<sup>3</sup>,</span>
+                  <span class="author-block">Daniel Barron<sup>8</sup>,</span>
+                  <span class="author-block">Quanzheng Li<sup>9</sup>,</span>
+                  <span class="author-block">Randy Hirschtick<sup>9</sup>,</span>
+                  <span class="author-block">Byung-Hoon Kim<sup>2</sup>,</span>
+                  <span class="author-block">Xiang Li<sup>9,10*</sup>,</span>
+                  <span class="author-block">Yixuan Yuan<sup>1*</sup></span>
 
                   <div class="is-size-5 publication-authors">
-                    <span class="author-block">Institution Name<br>Conferance name and year</span>
-                    <span class="eql-cntrb"><small><br><sup>*</sup>Indicates Equal Contribution</small></span>
+                    <div><sup>1</sup> The Chinese University of Hong Kong, Hong Kong</div>
+                    <div><sup>2</sup> Yonsei University, Seoul, South Korea</div>
+                    <div><sup>3</sup> University of Georgia, Athens, GA</div>
+                    <div><sup>4</sup> University of Sydney, Sydney, Australia</div>
+                    <div><sup>5</sup> Yale School of Medicine, New Haven, CT</div>
+                    <div><sup>6</sup> Emory University, Atlanta, GA</div>
+                    <div><sup>7</sup> Lehigh University, Bethlehem, PA</div>
+                    <div><sup>8</sup> Brigham and Women’s Hospital, Boston, MA</div>
+                    <div><sup>9</sup> Massachusetts General Hospital, Boston, MA</div>
+                    <div><sup>10</sup> Kempner Institute for Natural and Artificial Intelligence, Cambridge, MA</div>
+                    <div style="margin-top:0.5em;">
+                      <small><sup>*</sup>Corresponding authors</small>
+                    </div>
                   </div>
 
                   <div class="column has-text-centered">
-                    <div class="publication-links">
-                         <!-- Arxiv PDF link -->
-                      <span class="link-block">
-                        <a href="https://arxiv.org/pdf/<ARXIV PAPER ID>.pdf" target="_blank"
-                        class="external-link button is-normal is-rounded is-dark">
-                        <span class="icon">
-                          <i class="fas fa-file-pdf"></i>
-                        </span>
-                        <span>Paper</span>
-                      </a>
-                    </span>
-
-                    <!-- Supplementary PDF link -->
-                    <span class="link-block">
-                      <a href="static/pdfs/supplementary_material.pdf" target="_blank"
-                      class="external-link button is-normal is-rounded is-dark">
-                      <span class="icon">
-                        <i class="fas fa-file-pdf"></i>
-                      </span>
-                      <span>Supplementary</span>
-                    </a>
-                  </span>
+                  <div class="publication-links">
 
                   <!-- Github link -->
                   <span class="link-block">
-                    <a href="https://github.com/YOUR REPO HERE" target="_blank"
+                    <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank"
                     class="external-link button is-normal is-rounded is-dark">
                     <span class="icon">
                       <i class="fab fa-github"></i>
@@ -106,12 +116,14 @@
 
                 <!-- ArXiv abstract Link -->
                 <span class="link-block">
-                  <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"
+                <a href="https://huggingface.co/zxcvb20001/NeuroSTORM" target="_blank"
                   class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
-                    <i class="ai ai-arxiv"></i>
+                    <img src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" alt="Hugging Face" style="height:1.2em;vertical-align:middle;">
                   </span>
-                  <span>arXiv</span>
+                  <span>HuggingFace</span>
+                </a>
+              </span>
                 </a>
               </span>
             </div>
@@ -123,23 +135,6 @@
 </section>
 
 
-<!-- Teaser video-->
-<section class="hero teaser">
-  <div class="container is-max-desktop">
-    <div class="hero-body">
-      <video poster="" id="tree" autoplay controls muted loop height="100%">
-        <!-- Your video here -->
-        <source src="static/videos/banner_video.mp4"
-        type="video/mp4">
-      </video>
-      <h2 class="subtitle has-text-centered">
-        Aliquam vitae elit ullamcorper tellus egestas pellentesque. Ut lacus tellus, maximus vel lectus at, placerat pretium mi. Maecenas dignissim tincidunt vestibulum. Sed consequat hendrerit nisl ut maximus. 
-      </h2>
-    </div>
-  </div>
-</section>
-<!-- End teaser video -->
-
 <!-- Paper abstract -->
 <section class="section hero is-light">
   <div class="container is-max-desktop">
@@ -148,7 +143,7 @@
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ullamcorper tellus sed ante aliquam tempus. Etiam porttitor urna feugiat nibh elementum, et tempor dolor mattis. Donec accumsan enim augue, a vulputate nisi sodales sit amet. Proin bibendum ex eget mauris cursus euismod nec et nibh. Maecenas ac gravida ante, nec cursus dui. Vivamus purus nibh, placerat ac purus eget, sagittis vestibulum metus. Sed vestibulum bibendum lectus gravida commodo. Pellentesque auctor leo vitae sagittis suscipit.
+            Functional Magnetic Resonance Imaging (fMRI) is crucial for studying brain function and diagnosing neurological disorders. However, existing methods for fMRI analysis face challenges in reproducibility and transferability due to complex pre-processing pipelines and task-specific model designs. In this work, we introduce a Neuroimaging Foundation Model with Spatial-Temporal Optimized and Representation Modeling (NeuroSTORM) that learns generalizable representations directly from 4D fMRI volumes and achieves efficient pre-trained knowledge transfer across diverse downstream applications. Specifically, NeuroSTORM is pre-trained on a remarkable 28.65 million fMRI frames (over 9,000 hours) collected from more than 50,000 subjects, spanning multiple centers and covering ages 5 to 100. NeuroSTORM employs a shifted scanning strategy based on a Mamba backbone, enabling efficient direct processing of 4D fMRI volumes. Moreover, we introduce a spatial-temporal optimized pre-training strategy coupled with a task-specific prompt tuning technique, enabling the model to learn transferable fMRI features for efficient downstream adaptation. Experimental results show that NeuroSTORM consistently outperforms existing methods across five diverse downstream tasks: age and gender prediction, phenotype prediction, disease diagnosis, fMRI-to-image retrieval, and task-based fMRI (tfMRI) state classification. To further validate the clinical utility of NeuroSTORM, we evaluate it on two clinical datasets comprising patients with 17 different diagnoses from hospitals in the United States, South Korea, and Australia. NeuroSTORM maintains high relevance in predicting psychological and cognitive phenotypes and achieves the best disease diagnosis performance among all existing methods. In summary, NeuroSTORM offers a standardized, open-source foundation model to enhance reproducibility and transferability in fMRI analysis for clinical applications.
           </p>
         </div>
       </div>
@@ -165,32 +160,25 @@
       <div id="results-carousel" class="carousel results-carousel">
        <div class="item">
         <!-- Your image here -->
-        <img src="static/images/carousel1.jpg" alt="MY ALT TEXT"/>
+        <img src="static/images/stage1.png" alt="MY ALT TEXT"/>
         <h2 class="subtitle has-text-centered">
-          First image description.
+          NeuroSTORM provides preprocessing tools for both volume-based and ROI-based methods.
         </h2>
       </div>
       <div class="item">
         <!-- Your image here -->
-        <img src="static/images/carousel2.jpg" alt="MY ALT TEXT"/>
+        <img src="static/images/stage2.png" alt="MY ALT TEXT"/>
         <h2 class="subtitle has-text-centered">
-          Second image description.
+          NeuroSTORM enables model training with customizable models and datasets.
         </h2>
       </div>
       <div class="item">
         <!-- Your image here -->
-        <img src="static/images/carousel3.jpg" alt="MY ALT TEXT"/>
+        <img src="static/images/stage3.png" alt="MY ALT TEXT"/>
         <h2 class="subtitle has-text-centered">
-         Third image description.
+         Users can add custom downstream tasks to NeuroSTORM.
        </h2>
      </div>
-     <div class="item">
-      <!-- Your image here -->
-      <img src="static/images/carousel4.jpg" alt="MY ALT TEXT"/>
-      <h2 class="subtitle has-text-centered">
-        Fourth image description.
-      </h2>
-    </div>
   </div>
 </div>
 </div>
@@ -198,80 +186,138 @@
 <!-- End image carousel -->
 
 
-
-
-<!-- Youtube video -->
-<section class="hero is-small is-light">
-  <div class="hero-body">
-    <div class="container">
-      <!-- Paper video. -->
-      <h2 class="title is-3">Video Presentation</h2>
-      <div class="columns is-centered has-text-centered">
-        <div class="column is-four-fifths">
-          
-          <div class="publication-video">
-            <!-- Youtube embed code here -->
-            <iframe src="https://www.youtube.com/embed/JkaxUblCGz0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<!-- End youtube video -->
-
-
-<!-- Video carousel -->
-<section class="hero is-small">
-  <div class="hero-body">
-    <div class="container">
-      <h2 class="title is-3">Another Carousel</h2>
-      <div id="results-carousel" class="carousel results-carousel">
-        <div class="item item-video1">
-          <video poster="" id="video1" autoplay controls muted loop height="100%">
-            <!-- Your video file here -->
-            <source src="static/videos/carousel1.mp4"
-            type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-video2">
-          <video poster="" id="video2" autoplay controls muted loop height="100%">
-            <!-- Your video file here -->
-            <source src="static/videos/carousel2.mp4"
-            type="video/mp4">
-          </video>
-        </div>
-        <div class="item item-video3">
-          <video poster="" id="video3" autoplay controls muted loop height="100%">\
-            <!-- Your video file here -->
-            <source src="static/videos/carousel3.mp4"
-            type="video/mp4">
-          </video>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<!-- End video carousel -->
-
-
-
-
-
-
 <!-- Paper poster -->
 <section class="hero is-small is-light">
   <div class="hero-body">
     <div class="container">
-      <h2 class="title">Poster</h2>
+      <h2 class="title">Introduction to NeuroSTORM Platform</h2>
+      <div class="content">
 
-      <iframe  src="static/pdfs/sample.pdf" width="100%" height="550">
-          </iframe>
-        
+        <ol>
+          <li>
+            <strong>How to preprocess your own data with NeuroSTORM</strong>
+            <ul>
+              <li>
+                <b>Pre-processing:</b> 
+                Please make sure you have completed the primary preprocessing pipeline, such as 
+                <a href="https://fsl.fmrib.ox.ac.uk/fsl/docs/#/" target="_blank">FSL</a>,
+                <a href="https://fmriprep.org/en/stable/" target="_blank">fMRIPrep</a>,
+                or the <a href="https://github.com/Washington-University/HCPpipelines" target="_blank">HCP pipeline</a>, 
+                and your data is aligned to MNI152 space.
+                You may also use our provided shell script for brain extraction:
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/datasets/brain_extraction.sh" target="_blank">brain_extraction.sh</a>
+                (based on FSL BET, please install 
+                <a href="https://fsl.fmrib.ox.ac.uk/fsl/docs/#/" target="_blank">FSL tool</a> first).
+                After running, brain mask files in <code>.nii.gz</code> format will be generated in the output directory.
+              </li>
+              <li>
+                <b>Prepare 4D input:</b> 
+                Use <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/datasets/preprocessing_volume.py" target="_blank">preprocessing_volume.py</a> 
+                to preprocess your data for model input. This tool supports bulk dataset processing, including background removal, resampling, Z-normalization, and saving frames as <code>.pt</code> files. If CPU is limited, preprocess in advance; if disk speed is the bottleneck, online preprocessing during training is an option.
+              </li>
+              <li>
+                <b>Prepare 2D input:</b> 
+                Use <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/datasets/generate_roi_data_from_nii.py" target="_blank">generate_roi_data_from_nii.py</a>
+                to convert 3D/4D data to 2D ROI-based data using available brain atlases. Multiple datasets and atlases are supported.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>How to run existing methods on supported datasets</strong>
+            <br>
+            You can use our prepared scripts to quickly reproduce the experiments from the paper: 
+            <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/scripts" target="_blank">scripts</a>
+          </li>
+
+          <li>
+            <strong>How to add new methods</strong>
+            <ul>
+              <li>
+                Add your model definition in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/models" target="_blank">models</a>,
+                and add the task head in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/models/heads" target="_blank">models/heads</a>.
+              </li>
+              <li>
+                If additional inputs or outputs are needed, modify 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/models/lightning_model.py" target="_blank">lightning_model.py</a>.
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>How to adapt NeuroSTORM to new datasets</strong>
+            <ul>
+              <li>
+                Please preprocess fMRI sequences and align to MNI152 space using tools like 
+                <a href="https://fmriprep.org/en/stable/" target="_blank">fMRIPrep</a>,
+                <a href="https://github.com/Washington-University/HCPpipelines" target="_blank">HCP pipelines</a>,
+                or refer to 
+                <a href="https://biobank.ctsu.ox.ac.uk/crystal/crystal/docs/brain_mri.pdf" target="_blank">UK Biobank MRI</a>.
+              </li>
+              <li>
+                Add your dataset in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/datasets/preprocessing_volume.py" target="_blank">preprocessing_volume.py</a>.
+                Modify:
+                <ul>
+                  <li>The naming convention for Volume data, in <code>determine_subject_name</code> function</li>
+                  <li>Choose the resize method: if similar to HCP-YA, use <code>select_middle_96</code>, otherwise use <code>resize_to_96</code></li>
+                </ul>
+              </li>
+              <li>
+                Initialize your dataset in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/datasets/fmri_datasets.py" target="_blank">fmri_datasets.py</a>,
+                and define loader in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/utils/data_module.py" target="_blank">data_module.py</a>
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>How to add new tasks</strong>
+            <ul>
+              <li>
+                Define the dataset label format in the <code>make_subject_dict</code> function from 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/utils/data_module.py" target="_blank">data_module.py</a>
+              </li>
+              <li>
+                Set the task type by specifying <code>--downstream_task</code> in the script.
+              </li>
+              <li>
+                Choose a classification or regression head. For custom tasks, add a new head definition in 
+                <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/models/heads" target="_blank">models/heads</a>
+              </li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>Related Links</strong>
+            <ul>
+              <li><a href="https://github.com/Transconnectome/SwiFT" target="_blank">SwiFT</a></li>
+              <li><a href="https://github.com/LifangHe/BrainGNN_Pytorch" target="_blank">BrainGNN_Pytorch</a></li>
+              <li><a href="https://github.com/MedARC-AI/MindEyeV2" target="_blank">MindEyeV2</a></li>
+              <li><a href="https://fsl.fmrib.ox.ac.uk/fsl/docs" target="_blank">FSL Docs</a></li>
+              <li><a href="https://github.com/Washington-University/HCPpipelines" target="_blank">HCP Pipelines</a></li>
+              <li><a href="https://github.com/nipreps/fmriprep" target="_blank">fMRIPrep</a></li>
+            </ul>
+          </li>
+        </ol>
+
       </div>
     </div>
-  </section>
+  </div>
+</section>
+
 <!--End paper poster -->
+
+
+<!-- Youtube video -->
+<!-- End youtube video -->
+
+
+<!-- Video carousel -->
+<!-- End video carousel -->
 
 
 <!--BibTex citation -->
@@ -293,8 +339,6 @@
           <p>
             Maintained by the <a href="https://www.ee.cuhk.edu.hk/~yxyuan/" target="_blank">AIM group</a> at the Chinese University of Hong Kong.
             <br> This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a> which was adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
-            <br> This website is licensed under a <a rel="license"  href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative
-            Commons Attribution-ShareAlike 4.0 International License</a>.
           </p>
 
         </div>

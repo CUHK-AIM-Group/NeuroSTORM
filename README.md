@@ -102,7 +102,7 @@ Our directory structure looks like this:
 
 ### 3.1 Pre-processing
 
-First, please ensure that you have applied a primary processing pipeline, such as [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs), [fMRIPrep](https://fmriprep.org/en/stable/), or [HCP pipeline](https://github.com/Washington-University/HCPpipelines), and that your data has been aligned into MNI152 space. You can also use our provided shell script for brain extraction. It is based on FSL BET， so you need install [FSL tool](https://fsl.fmrib.ox.ac.uk/fsl/docs). After running the script, brain mask files in the nii.gz format will be generated in the output directory.
+First, please ensure that you have applied a primary processing pipeline, such as [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/), [fMRIPrep](https://fmriprep.org/en/stable/), or [HCP pipeline](https://github.com/Washington-University/HCPpipelines), and that your data has been aligned into MNI152 space. You can also use our provided shell script for brain extraction. It is based on FSL BET, so you need install [FSL tool](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/). After running the script, brain mask files in the nii.gz format will be generated in the output directory.
 
 
 ```bash
