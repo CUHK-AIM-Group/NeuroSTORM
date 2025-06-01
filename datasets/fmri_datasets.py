@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.utils.data import Dataset, IterableDataset
+import torch.nn.functional as F
 
 import numpy as np
 import random
@@ -19,6 +20,41 @@ def pad_to_96(y):
 
     return y
 
+import torch
+import torch.nn.functional as F
+
+def resize_volume(y, target_size):
+    """
+    y: 5D tensor [B, H, W, D, T]
+    target_size: 4d tuple/list (H', W', D', T)
+    """
+    current_size = y.shape
+
+    if len(current_size) != 5:
+        raise ValueError("Input y must be a 5-dimensional tensor.")
+    if len(target_size) != 4:
+        raise ValueError("Target size must be a tuple or list of length 4.")
+
+    if current_size[-1] != target_size[-1]:
+        raise ValueError(f"y's last dimension {current_size[-1]} and target_size's last dimension {target_size[-1]} must match.")
+        
+    if current_size[1:4] != tuple(target_size[:3]):
+        resized_y = torch.empty(
+            (current_size[0],) + tuple(target_size),
+            dtype=y.dtype, device=y.device
+        )
+
+        for i in range(current_size[0]):
+            for t in range(current_size[-1]):
+                data_tensor = y[i, :, :, :, t]
+
+                original_dtype = data_tensor.dtype
+                resized_tensor = F.interpolate(data_tensor.float().unsqueeze(0).unsqueeze(0), size=tuple(target_size[:3]), mode='trilinear', align_corners=False).squeeze(0).squeeze(0).to(original_dtype)
+                resized_y[i, :, :, :, t] = resized_tensor
+        return resized_y
+    else:
+        return y
+
 
 class BaseDataset(Dataset):
     def __init__(self, **kwargs):
@@ -27,10 +63,17 @@ class BaseDataset(Dataset):
         self.sample_duration = self.sequence_length * self.stride_within_seq
         self.stride = max(round(self.stride_between_seq * self.sample_duration), 1)
         self.data = self._set_data(self.root, self.subject_dict)
+
+        # import ipdb; ipdb.set_trace()
+        # index = 0
+        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
+        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
+        # y = pad_to_96(y)
+        # y = resize_volume(y, self.img_size)
     
     def register_args(self,**kwargs):
-        for name,value in kwargs.items():
-            setattr(self,name,value)
+        for name, value in kwargs.items():
+            setattr(self, name, value)
         self.kwargs = kwargs
     
     def load_sequence(self, subject_path, start_frame, sample_duration, num_frames=None): 
@@ -121,9 +164,11 @@ class BaseDataset(Dataset):
         if self.contrastive or self.mae:
             y, rand_y = self.load_sequence(subject_path, start_frame, sequence_length)
             y = pad_to_96(y)
+            y = resize_volume(y, self.img_size)
 
             if self.contrastive:
                 rand_y = pad_to_96(rand_y)
+                rand_y = resize_volume(rand_y, self.img_size)
 
             return {
                 "fmri_sequence": (y, rand_y),
@@ -135,6 +180,7 @@ class BaseDataset(Dataset):
         else:   
             y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
             y = pad_to_96(y)
+            y = resize_volume(y, self.img_size)
 
             return {
                 "fmri_sequence": y,

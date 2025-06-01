@@ -64,7 +64,6 @@ def cli_main():
     if args.resume_ckpt_path is None and args.auto_resume:
         resume_ckpt_path = os.path.join('output', category_dir, args.project_name, 'last.ckpt')
     setattr(args, "resume_ckpt_path", resume_ckpt_path)
-    import ipdb; ipdb.set_trace()
 
     if args.resume_ckpt_path is not None:
         # resume previous experiment

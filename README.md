@@ -20,7 +20,7 @@ This repo provides a platform that covers all aspects involved in using deep lea
 
 This platform is proposed in our paper *Towards a General-Purpose Foundation Model for fMRI Analysis*. NeuroSTORM is a pretrained fMRI foundation model developed by the AIM group for fMRI analysis. You can run the pre-training and fine-tuning of NeuroSTORM in this repo. Specifically, our code provides the following:
 
-- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like NeuroSTORM), 2D time series data (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
+- Preprocessing tools for fMRI volumes. You can use the tools to process fMRI volumes in MNI152 space into a unified 4D Volume (for models like NeuroSTORM), 2D time series d   ata (for models like BNT), and 2D Functional Correlation Matrix (for models like BrainGNN).
 - Trainer for pre-training, including the MAE-based mechanism proposed in NeuroSTORM and the contrastive learning approach in SwiFT.
 - Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in NeuroSTORM.
 - A comprehensive fMRI benchmark, including five tasks: Age and Gender Prediction, Phenotype Prediction, Disease Diagnosis, fMRI Retrieval, and Task fMRI State Classification.

@@ -3,7 +3,7 @@
 
 # Set default task_name
 task_name="sex"
-batch_size="12"
+batch_size="8"
 
 # Override with the arguments if provided
 if [ ! -z "$1" ]; then
@@ -50,8 +50,9 @@ python main.py \
   --learning_rate 5e-5 \
   --model fmrifound \
   --depth 2 2 6 2 \
-  --embed_dim 36 \
-  --sequence_length 20 \
-  --img_size 96 96 96 20 \
+  --embed_dim 72 \
+  --sequence_length 40 \
+  --img_size 96 96 96 40 \
   --first_window_size 4 4 4 4 \
-  --window_size 4 4 4 4
+  --window_size 4 4 4 4 \
+  --print_flops

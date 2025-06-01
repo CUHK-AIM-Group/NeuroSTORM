@@ -509,6 +509,7 @@ class fMRIDataModule(pl.LightningDataModule):
         Dataset = self.get_dataset()
         params = {
                 "root": self.hparams.image_path,
+                "img_size": self.hparams.img_size,
                 "sequence_length": self.hparams.sequence_length,
                 "contrastive": self.hparams.use_contrastive,
                 "contrastive_type": self.hparams.contrastive_type,

@@ -52,7 +52,8 @@ class LightningModel(pl.LightningModule):
             from torchsummary import summary
             from thop import profile
 
-            input = torch.randn((1, 1, 48, 48, 48, 20)).cuda()
+            img_size = self.hparams.img_size    
+            input = torch.randn([1, 1] + img_size).cuda()
             
             flops, params = profile(self.model.cuda(), inputs=(input, ))
             print('FLOPs = ' + str(flops/1000**3) + 'G')
