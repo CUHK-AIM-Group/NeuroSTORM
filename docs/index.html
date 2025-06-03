@@ -63,43 +63,12 @@
       <div class="container is-max-desktop">
         <div class="columns is-centered">
           <div class="column has-text-centered">
-            <h1 class="title is-1 publication-title">NeuroSTORM: Towards a general-purpose foundation model for fMRI analysis</h1>
+            <h1 class="title is-1 publication-title">
+              <img src="static/images/icon.png" alt="NeuroSTORM Icon" style="height: 2.0em; vertical-align: middle; margin-right: 0.1em;">
+              NeuroSTORM: A Deep Learning Toolkit for fMRI Analysis
+            </h1>
             <div class="is-size-5 publication-authors">
                   <!-- Paper authors -->
-                  <span class="author-block">Cheng Wang<sup>1</sup>,</span>
-                  <span class="author-block">Yu Jiang<sup>1</sup>,</span>
-                  <span class="author-block">Zhihao Peng<sup>1</sup>,</span>
-                  <span class="author-block">Chenxin Li<sup>1</sup>,</span>
-                  <span class="author-block">Changbae Bang<sup>2</sup>,</span>
-                  <span class="author-block">Lin Zhao<sup>3</sup>,</span>
-                  <span class="author-block">Jinglei Lv<sup>4</sup>,</span>
-                  <span class="author-block">Jorge Sepulcre<sup>5</sup>,</span>
-                  <span class="author-block">Carl Yang<sup>6</sup>,</span>
-                  <span class="author-block">Lifang He<sup>7</sup>,</span>
-                  <span class="author-block">Tianming Liu<sup>3</sup>,</span>
-                  <span class="author-block">Daniel Barron<sup>8</sup>,</span>
-                  <span class="author-block">Quanzheng Li<sup>9</sup>,</span>
-                  <span class="author-block">Randy Hirschtick<sup>9</sup>,</span>
-                  <span class="author-block">Byung-Hoon Kim<sup>2</sup>,</span>
-                  <span class="author-block">Xiang Li<sup>9,10*</sup>,</span>
-                  <span class="author-block">Yixuan Yuan<sup>1*</sup></span>
-
-                  <div class="is-size-5 publication-authors">
-                    <div><sup>1</sup> The Chinese University of Hong Kong, Hong Kong</div>
-                    <div><sup>2</sup> Yonsei University, Seoul, South Korea</div>
-                    <div><sup>3</sup> University of Georgia, Athens, GA</div>
-                    <div><sup>4</sup> University of Sydney, Sydney, Australia</div>
-                    <div><sup>5</sup> Yale School of Medicine, New Haven, CT</div>
-                    <div><sup>6</sup> Emory University, Atlanta, GA</div>
-                    <div><sup>7</sup> Lehigh University, Bethlehem, PA</div>
-                    <div><sup>8</sup> Brigham and Women’s Hospital, Boston, MA</div>
-                    <div><sup>9</sup> Massachusetts General Hospital, Boston, MA</div>
-                    <div><sup>10</sup> Kempner Institute for Natural and Artificial Intelligence, Cambridge, MA</div>
-                    <div style="margin-top:0.5em;">
-                      <small><sup>*</sup>Corresponding authors</small>
-                    </div>
-                  </div>
-
                   <div class="column has-text-centered">
                   <div class="publication-links">
 
@@ -133,24 +102,6 @@
     </div>
   </div>
 </section>
-
-
-<!-- Paper abstract -->
-<section class="section hero is-light">
-  <div class="container is-max-desktop">
-    <div class="columns is-centered has-text-centered">
-      <div class="column is-four-fifths">
-        <h2 class="title is-3">Abstract</h2>
-        <div class="content has-text-justified">
-          <p>
-            Functional Magnetic Resonance Imaging (fMRI) is crucial for studying brain function and diagnosing neurological disorders. However, existing methods for fMRI analysis face challenges in reproducibility and transferability due to complex pre-processing pipelines and task-specific model designs. In this work, we introduce a Neuroimaging Foundation Model with Spatial-Temporal Optimized and Representation Modeling (NeuroSTORM) that learns generalizable representations directly from 4D fMRI volumes and achieves efficient pre-trained knowledge transfer across diverse downstream applications. Specifically, NeuroSTORM is pre-trained on a remarkable 28.65 million fMRI frames (over 9,000 hours) collected from more than 50,000 subjects, spanning multiple centers and covering ages 5 to 100. NeuroSTORM employs a shifted scanning strategy based on a Mamba backbone, enabling efficient direct processing of 4D fMRI volumes. Moreover, we introduce a spatial-temporal optimized pre-training strategy coupled with a task-specific prompt tuning technique, enabling the model to learn transferable fMRI features for efficient downstream adaptation. Experimental results show that NeuroSTORM consistently outperforms existing methods across five diverse downstream tasks: age and gender prediction, phenotype prediction, disease diagnosis, fMRI-to-image retrieval, and task-based fMRI (tfMRI) state classification. To further validate the clinical utility of NeuroSTORM, we evaluate it on two clinical datasets comprising patients with 17 different diagnoses from hospitals in the United States, South Korea, and Australia. NeuroSTORM maintains high relevance in predicting psychological and cognitive phenotypes and achieves the best disease diagnosis performance among all existing methods. In summary, NeuroSTORM offers a standardized, open-source foundation model to enhance reproducibility and transferability in fMRI analysis for clinical applications.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-<!-- End paper abstract -->
 
 
 <!-- Image carousel -->
