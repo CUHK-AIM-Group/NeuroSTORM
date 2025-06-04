@@ -32,6 +32,13 @@
     .content a:hover {
       color: #ff6600;   /* 鼠标悬停时的颜色 */
     }
+    .carousel.results-carousel img {
+      max-width: 800px;
+      width: 750%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
   </style>
   
   <title>Academic Project Page</title>
@@ -65,7 +72,7 @@
           <div class="column has-text-centered">
             <h1 class="title is-1 publication-title">
               <img src="static/images/icon.png" alt="NeuroSTORM Icon" style="height: 2.0em; vertical-align: middle; margin-right: 0.1em;">
-              NeuroSTORM: A Deep Learning Toolkit for fMRI Analysis
+              NeuroSTORM: A Deep Learning Platform for fMRI Analysis
             </h1>
             <div class="is-size-5 publication-authors">
                   <!-- Paper authors -->
@@ -141,7 +148,7 @@
 <section class="hero is-small is-light">
   <div class="hero-body">
     <div class="container">
-      <h2 class="title">Introduction to NeuroSTORM Platform</h2>
+      <h2 class="title">1. Develop Deep-learning Methods with NeuroSTORM</h2>
       <div class="content">
 
         <ol>
@@ -263,12 +270,259 @@
 <!--End paper poster -->
 
 
-<!-- Youtube video -->
-<!-- End youtube video -->
+<!-- Supported Dataset -->
+<section class="hero is-white">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title">2. Supported Datasets</h2>
+      <div class="content">
+
+        <p>
+          NeuroSTORM supports a wide range of publicly available fMRI datasets for both pre-training and downstream analysis. The table below summarizes key characteristics of each dataset, including the subject number, male/female ratio, spatial resolution, TR, and official homepage.
+        </p>
+
+        <table class="table is-striped is-hoverable is-fullwidth" style="font-size:1em;">
+          <thead>
+            <tr>
+              <th>Dataset Name (Abbreviation)</th>
+              <th>Subjects<br/>(Male/Female)</th>
+              <th>Spatial Resolution</th>
+              <th>TR (ms)</th>
+              <th>Homepage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>UK Biobank (UKB)</b></td>
+              <td>40,842<br>(17,720 / 23,122)</td>
+              <td>2.4 × 2.4 × 2.4 mm³</td>
+              <td>735</td>
+              <td><a href="https://www.ukbiobank.ac.uk/" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Adolescent Brain Cognitive Development (ABCD)</b></td>
+              <td>9,448<br>(4,931 / 4,517)</td>
+              <td>2.4 × 2.4 × 2.4 mm³</td>
+              <td>800</td>
+              <td><a href="https://abcdstudy.org/" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Human Connectome Project - Young Adult (HCP-YA)</b></td>
+              <td>1,206<br>(550 / 656)</td>
+              <td>2 × 2 × 2 mm³</td>
+              <td>720</td>
+              <td><a href="https://www.humanconnectome.org/" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Human Connectome Project - Aging (HCP-A)</b></td>
+              <td>725<br>(319 / 406)</td>
+              <td>2 × 2 × 2 mm³</td>
+              <td>800</td>
+              <td><a href="https://www.humanconnectome.org/study/hcp-lifespan-aging" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Human Connectome Project - Development (HCP-D)</b></td>
+              <td>652<br>(301 / 351)</td>
+              <td>2 × 2 × 2 mm³</td>
+              <td>800</td>
+              <td><a href="https://www.humanconnectome.org/study/hcp-lifespan-development" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Human Connectome Project - Early Psychosis (HCP-EP)</b></td>
+              <td>252<br>(94 / 158)</td>
+              <td>2 × 2 × 2 mm³</td>
+              <td>800</td>
+              <td><a href="https://www.humanconnectome.org/study/hcp-early-psychosis" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>ADHD-200 Sample (ADHD200)</b></td>
+              <td>973<br>(600 / 373)</td>
+              <td>3 × 3 × 4 mm³</td>
+              <td>2000</td>
+              <td><a href="http://fcon_1000.projects.nitrc.org/indi/adhd200/" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Autism Brain Imaging Data Exchange (ABIDE)</b></td>
+              <td>1,112<br>(948 / 164)</td>
+              <td>3 × 3 × 3 mm³</td>
+              <td>2000</td>
+              <td><a href="http://fcon_1000.projects.nitrc.org/indi/abide/" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>UCLA Consortium for Neuropsychiatric Phenomics (UCLA)</b></td>
+              <td>272<br>(222 / 50)</td>
+              <td>3 × 3 × 4 mm³</td>
+              <td>2000</td>
+              <td><a href="https://openneuro.org/datasets/ds000030" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Center for Biomedical Research Excellence (COBRE)</b></td>
+              <td>173<br>(130 / 43)</td>
+              <td>3.75 × 3.75 × 4.55 mm³</td>
+              <td>2000</td>
+              <td><a href="https://fcon_1000.projects.nitrc.org/indi/retro/cobre.html" target="_blank">Link</a></td>
+            </tr>
+            <tr>
+              <td><b>Motor Neuron Disease fMRI Dataset (MND)</b></td>
+              <td>59<br>(44 / 15)</td>
+              <td>2.395 × 2.395 × 2.4 mm³</td>
+              <td>2000</td>
+              <td>--</td>
+            </tr>
+            <tr>
+              <td><b>Transdiagnostic Connectome Project (TCP)</b></td>
+              <td>245<br>(143 / 102)</td>
+              <td>2 × 2 × 2 mm³</td>
+              <td>800</td>
+              <td><a href="https://openneuro.org/datasets/ds004215" target="_blank">Link</a></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Dataset Descriptions</h3>
+        <ul>
+          <li>
+            <b>UK Biobank (UKB):</b>
+            A large-scale prospective study from the UK containing health, genetic, and neuroimaging data of over 40,000 middle-aged participants. fMRI is acquired at 2.4mm isotropic resolution (TR=735ms).
+          </li>
+          <li>
+            <b>Adolescent Brain Cognitive Development (ABCD):</b>
+            Longitudinal neuroimaging of ~9,500 children in the US, with multimodal data and 2.4mm/800ms fMRI scans.
+          </li>
+          <li>
+            <b>Human Connectome Project – Young Adult (HCP-YA), Aging (HCP-A), Development (HCP-D):</b>
+            Three high-resolution (2mm) public datasets for mapping brain structure and function across the lifespan (children, young adults, elderly).
+          </li>
+          <li>
+            <b>Human Connectome Project – Early Psychosis (HCP-EP):</b>
+            fMRI/clinical data for early psychosis research (252 subjects), 2mm, TR=800ms.
+          </li>
+          <li>
+            <b>ADHD-200 Sample (ADHD200):</b>
+            Multi-site data of 973 children/adolescents, 3×3×4mm, TR=2000ms, focused on ADHD diagnosis.
+          </li>
+          <li>
+            <b>Autism Brain Imaging Data Exchange (ABIDE):</b>
+            Aggregated from 17 sites, 1,112 subjects (948 males, 164 females) for ASD studies, 3mm, TR=2000ms.
+          </li>
+          <li>
+            <b>UCLA Consortium for Neuropsychiatric Phenomics (UCLA):</b>
+            272 subjects (multi-diagnostic), 3×3×4mm, TR=2000ms.
+          </li>
+          <li>
+            <b>Center for Biomedical Research Excellence (COBRE):</b>
+            173 subjects (schizophrenia and controls), 3.75×3.75×4.55mm, TR=2000ms.
+          </li>
+          <li>
+            <b>Motor Neuron Disease fMRI Dataset (MND):</b>
+            59 participants (ALS and controls), 2.4mm, TR=2000ms, collected in Australia.
+          </li>
+          <li>
+            <b>Transdiagnostic Connectome Project (TCP):</b>
+            245 subjects with multiple psychiatric diagnoses (2mm, TR=800ms), harmonized imaging.
+          </li>
+        </ul>
+
+        <div class="container" style="margin-top:2em; margin-bottom:2em;">
+          <div class="columns is-vcentered is-desktop">
+            <div class="column has-text-centered">
+              <figure>
+                <img src="static/images/data_sun.png" alt="Dataset distribution sunburst plot" style="max-width:100%; height:380px; object-fit:contain;"/>
+                <figcaption style="margin-top:0.5em; font-size:1em; color:#666;">Dataset and sex distribution overview.</figcaption>
+              </figure>
+            </div>
+            <div class="column has-text-centered">
+              <figure>
+                <img src="static/images/sankey.png" alt="Sankey diagram for NeuroSTORM dataset composition" style="max-width:100%; height:380px; object-fit:contain;"/>
+                <figcaption style="margin-top:0.5em; font-size:1em; color:#666;">Sample composition in NeuroSTORM datasets.</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End supported Dataset -->
 
 
-<!-- Video carousel -->
-<!-- End video carousel -->
+<!-- Supported downstream task -->
+<section class="hero is-light">
+  <div class="hero-body">
+    <div class="container">
+      <h2 class="title">3. Supported Tasks</h2>
+      <div class="content">
+
+        <h3>1. Age and Gender Prediction</h3>
+        <p>
+          This task evaluates the ability to predict demographic variables (age and biological sex) from resting-state fMRI (rsfMRI) sequences. It is a fundamental benchmark for assessing generalizable neural representations.
+          <br>
+          <b>How to use in NeuroSTORM:</b>
+          <ul>
+            <li>
+              <b>Sex classification (reported):</b><br>
+              <code>--downstream_task_id 1 --downstream_task_type classification --task_name sex</code>
+            </li>
+            <li>
+              <b>Age prediction (regression):</b><br>
+              <code>--downstream_task_id 1 --downstream_task_type regression --task_name age</code>
+            </li>
+          </ul>
+        </p>
+
+        <h3>2. Phenotype Prediction</h3>
+        <p>
+          This task focuses on predicting various cognitive, behavioral, or clinical phenotype scores from fMRI data. Each phenotype (e.g., MMSE Score, Social Task Score, PANSS, DASS, etc.) can be selected as a regression target.
+          <br>
+          <b>How to use in NeuroSTORM:</b>
+          <ul>
+            <li>
+              <b>Phenotype regression:</b><br>
+              <code>--downstream_task_id 2 --downstream_task_type regression --task_name your_score_name</code>
+              <br>
+              Replace <code>your_score_name</code> with the phenotype to predict (e.g., <code>MMSE</code>, <code>PANSS_Positive</code>).
+            </li>
+          </ul>
+        </p>
+
+        <h3>3. Disease Diagnosis</h3>
+        <p>
+          This task consists of classifying subjects into diagnostic categories (e.g., healthy control vs. disorder) based on their fMRI data. It is applicable to datasets such as HCP-EP, ABIDE, ADHD200, COBRE, UCLA, and MND.
+          <br>
+          <b>How to use in NeuroSTORM:</b>
+          <ul>
+            <li>
+              <b>Disease classification:</b><br>
+              <code>--downstream_task_id 3 --downstream_task_type classification --task_name diagnosis</code>
+            </li>
+          </ul>
+        </p>
+
+        <h3>4. fMRI Retrieval</h3>
+        <p>
+          This task explores the alignment between fMRI patterns and external semantic data (e.g. images, captions) for brain decoding and retrieval. <br>
+          <b>Support for this task in NeuroSTORM will be released soon.</b>
+        </p>
+
+        <h3>5. Task-based fMRI State Classification</h3>
+        <p>
+          This task evaluates the model's ability to classify cognitive state or task condition from task-based fMRI (tfMRI) sequences. For example, differentiating between emotion, language, or gambling task states in HCP-YA.
+          <br>
+          <b>How to use in NeuroSTORM:</b>
+          <ul>
+            <li>
+              <b>State classification:</b><br>
+              <code>--downstream_task_id 5 --downstream_task_type classification --task_name state_classification</code>
+            </li>
+          </ul>
+        </p>
+
+      </div>
+    </div>
+  </div>
+</section>
+<!-- End supported downstream task-->
 
 
 <!--BibTex citation -->
