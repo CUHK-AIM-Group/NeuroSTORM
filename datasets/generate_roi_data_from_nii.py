@@ -59,7 +59,7 @@ def process_single_fmri_file(args):
         num_frames = fmri_data.shape[-1]
     except:
         print("Failed to load fMRI data: {}".format(fmri_file))
-        import ipdb; ipdb.set_trace()
+        os.remove(fmri_file)
         return
 
     for atlas_name, atlas_data in atlases.items():

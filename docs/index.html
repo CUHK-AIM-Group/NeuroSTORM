@@ -381,47 +381,223 @@
 
         <h3>Dataset Descriptions</h3>
         <ul>
-          <li>
-            <b>UK Biobank (UKB):</b>
-            A large-scale prospective study from the UK containing health, genetic, and neuroimaging data of over 40,000 middle-aged participants. fMRI is acquired at 2.4mm isotropic resolution (TR=735ms).
-          </li>
-          <li>
-            <b>Adolescent Brain Cognitive Development (ABCD):</b>
-            Longitudinal neuroimaging of ~9,500 children in the US, with multimodal data and 2.4mm/800ms fMRI scans.
-          </li>
-          <li>
-            <b>Human Connectome Project – Young Adult (HCP-YA), Aging (HCP-A), Development (HCP-D):</b>
-            Three high-resolution (2mm) public datasets for mapping brain structure and function across the lifespan (children, young adults, elderly).
-          </li>
-          <li>
-            <b>Human Connectome Project – Early Psychosis (HCP-EP):</b>
-            fMRI/clinical data for early psychosis research (252 subjects), 2mm, TR=800ms.
-          </li>
-          <li>
-            <b>ADHD-200 Sample (ADHD200):</b>
-            Multi-site data of 973 children/adolescents, 3×3×4mm, TR=2000ms, focused on ADHD diagnosis.
-          </li>
-          <li>
-            <b>Autism Brain Imaging Data Exchange (ABIDE):</b>
-            Aggregated from 17 sites, 1,112 subjects (948 males, 164 females) for ASD studies, 3mm, TR=2000ms.
-          </li>
-          <li>
-            <b>UCLA Consortium for Neuropsychiatric Phenomics (UCLA):</b>
-            272 subjects (multi-diagnostic), 3×3×4mm, TR=2000ms.
-          </li>
-          <li>
-            <b>Center for Biomedical Research Excellence (COBRE):</b>
-            173 subjects (schizophrenia and controls), 3.75×3.75×4.55mm, TR=2000ms.
-          </li>
-          <li>
-            <b>Motor Neuron Disease fMRI Dataset (MND):</b>
-            59 participants (ALS and controls), 2.4mm, TR=2000ms, collected in Australia.
-          </li>
-          <li>
-            <b>Transdiagnostic Connectome Project (TCP):</b>
-            245 subjects with multiple psychiatric diagnoses (2mm, TR=800ms), harmonized imaging.
-          </li>
+          <details>
+            <summary>
+              <b>UK Biobank (UKB):</b>
+              A large-scale prospective study from the UK containing health, genetic, and neuroimaging data of over 40,000 middle-aged participants. fMRI is acquired at 2.4mm isotropic resolution (TR=735ms).
+            </summary>
+            <p>
+              The UK Biobank (UKB) is one of the world's largest population-based health resource projects, comprising extensive genetic, clinical, lifestyle, and imaging data from over 500,000 participants, of which more than 40,000 have multimodal brain MRI—including both resting-state and task-based fMRI scans. Initiated between 2006 and 2010, UKB focuses on adults aged 40–69, with repeated imaging on a subset, enabling longitudinal analyses. fMRI data are acquired on Siemens Skyra 3T scanners, with a resolution of 2.4×2.4×2.4 mm³, and a fast TR of 735ms. The dataset includes both rsfMRI (6 min scan) and tfMRI (motor, emotion, social, gambling, and relational tasks), plus comprehensive demographic, cognitive, and health phenotypes. Standardized preprocessing pipelines (including motion correction, ICA-FIX denoising, and registration to MNI152) are publicly available. UKB is widely used for large-scale brain-behavior association studies, disease risk modeling, and neuroimaging foundation model pre-training.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>UK Biobank (UKB)</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI and tfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>Emotion, Gambling, Motor, Relational, Social</td></tr>
+              <tr><th>Age Range</th><td>40–69 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~46% male, ~54% female</td></tr>
+              <tr><th>Patient/Control</th><td>Population-based (includes healthy and various disease cases)</td></tr>
+              <tr><th>Disease Types</th><td>Various (not a patient cohort, but disease info available)</td></tr>
+              <tr><th>Used in Tasks</th><td>Pre-training, Task 1 (age/gender prediction)</td></tr>
+              <tr><th>Sample Size</th><td>~40,842 with fMRI</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Adolescent Brain Cognitive Development (ABCD):</b>
+              Longitudinal neuroimaging of ~9,500 children in the US, with multimodal data and 2.4mm/800ms fMRI scans.
+            </summary>
+            <p>
+              The ABCD Study is the largest long-term study of brain development and child/adolescent health in the US. It follows over 11,800 children (9–10 at baseline) through adolescence, with repeated multimodal MRI, cognitive, behavioral, genetic, and environmental data collection. Neuroimaging includes high-resolution rsfMRI (2.4mm³, TR=800ms) and tfMRI (emotional, reward, cognitive tasks), harmonized across 21 sites and 3 major scanner vendors. Imaging pipelines are derived from HCP preprocessing (motion correction, normalization, artifact removal), with ROI time-series available (e.g., Schaefer atlas). ABCD supports studies of typical development, neuropsychiatric risk, and gene–brain–behavior relationships.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>ABCD</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI and tfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>Emotional n-back, Reward, Stop-signal, Monetary Incentive Delay</td></tr>
+              <tr><th>Age Range</th><td>9–13 years (at latest release)</td></tr>
+              <tr><th>Gender Ratio</th><td>~52% male, ~48% female</td></tr>
+              <tr><th>Patient/Control</th><td>Community sample (includes healthy and at-risk youth)</td></tr>
+              <tr><th>Disease Types</th><td>Not specific, but behavioral/clinical phenotypes available</td></tr>
+              <tr><th>Used in Tasks</th><td>Pre-training, Task 1 (age/gender)</td></tr>
+              <tr><th>Sample Size</th><td>~9,448 with fMRI</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Human Connectome Project – Young Adult (HCP-YA), Aging (HCP-A), Development (HCP-D):</b>
+              Three high-resolution (2mm) public datasets for mapping brain structure and function across the lifespan (children, young adults, elderly).
+            </summary>
+            <p>
+              The HCP is an NIH initiative to map human brain connectivity with unprecedented detail. Three major lifespan datasets are:
+              <ul>
+                <li><b>HCP-YA</b>: 1,206 healthy young adults (22–37y), scanned at 3T and 7T. Imaging includes rsfMRI (2mm³, TR=720ms; 1 hour per subject), tfMRI (7 tasks: working memory, emotion, language, motor, gambling, relational, social), and dMRI. Extensively preprocessed: motion correction, ICA-FIX, MNI registration, surface/volumetric data.</li>
+                <li><b>HCP-A</b>: 725 adults aged 36–100, using similar MRI protocols. Focused on typical aging and age-related brain changes.</li>
+                <li><b>HCP-D</b>: 652 children and adolescents (ages 5–21), using harmonized imaging, enables developmental connectomics.</li>
+              </ul>
+              All datasets include rich behavioral, cognitive, and demographic data. Used widely for benchmarking machine learning, connectomics, and lifespan brain research.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>HCP-YA, HCP-A, HCP-D</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI and tfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>Emotion, Gambling, Language, Motor, Relational, Social, Working Memory</td></tr>
+              <tr><th>Age Range</th><td>HCP-YA: 22–37; HCP-A: 36–100; HCP-D: 5–21</td></tr>
+              <tr><th>Gender Ratio</th><td>~47% male, ~53% female (YA); similar balance in others</td></tr>
+              <tr><th>Patient/Control</th><td>Healthy volunteers</td></tr>
+              <tr><th>Disease Types</th><td>None (controls only)</td></tr>
+              <tr><th>Used in Tasks</th><td>Pre-training, Task 1 (age/gender), Task 2 (phenotype), Task 5 (tfMRI state classification)</td></tr>
+              <tr><th>Sample Size</th><td>HCP-YA: 1,206; HCP-A: 725; HCP-D: 652</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Human Connectome Project – Early Psychosis (HCP-EP):</b>
+              fMRI/clinical data for early psychosis research (252 subjects), 2mm, TR=800ms.
+            </summary>
+            <p>
+              The HCP-EP dataset focuses on individuals in the early phases (within 5 years) of psychotic disorders, including both affective and non-affective psychoses, and matched healthy controls. Participants (ages 16–35) are clinically characterized, with rsfMRI (2mm³, TR=800ms) and full neurocognitive/clinical assessments. Imaging is harmonized with HCP-Lifespan protocols (motion correction, ICA-FIX, MNI). The dataset supports studies of biomarkers and network changes in schizophrenia spectrum disorders and is a benchmark for disease diagnosis tasks.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>HCP-EP</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>16–35 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~42% male, ~58% female</td></tr>
+              <tr><th>Patient/Control</th><td>Patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Early psychosis (schizophrenia, schizoaffective, bipolar with psychosis)</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>252 (57 affective psychosis, 127 non-affective psychosis, 68 controls)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>ADHD-200 Sample (ADHD200):</b>
+              Multi-site data of 973 children/adolescents, 3×3×4mm, TR=2000ms, focused on ADHD diagnosis.
+            </summary>
+            <p>
+              The ADHD-200 Sample is a multi-center open dataset for ADHD biomarker discovery. It consists of 973 children and adolescents (ages 7–21) from 8 US and 4 Chinese sites, including both ADHD (combined, inattentive, hyperactive-impulsive) and typically developing controls. Imaging includes resting-state fMRI (3×3×4 mm³, TR=2s) and T1-weighted MRI. Phenotypic data covers diagnosis, ADHD subtype, IQ, age, sex, and clinical symptoms. Preprocessing pipelines (Athena, NIAK, others) are public, supporting motion correction, normalization, and ROI extraction. ADHD200 is widely used for benchmarking machine learning models for disease classification.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>ADHD-200</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>7–21 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~73% male, ~27% female</td></tr>
+              <tr><th>Patient/Control</th><td>ADHD patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Attention-Deficit/Hyperactivity Disorder (ADHD)</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>973 (362 ADHD, 611 controls)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Autism Brain Imaging Data Exchange (ABIDE):</b>
+              Aggregated from 17 sites, 1,112 subjects (948 males, 164 females) for ASD studies, 3mm, TR=2000ms.
+            </summary>
+            <p>
+              ABIDE collates resting-state fMRI and anatomical MRI from 1,112 subjects (539 with Autism Spectrum Disorder, 573 controls), ages 7–64, across 17 international sites. Imaging protocols are heterogeneous (typical: 3mm³, TR=2s). Extensive phenotypic/clinical data are included, covering ASD diagnosis, IQ, and behavioral scales. Preprocessing (multiple pipelines) includes normalization, head motion correction, nuisance regression, registration, and ROI-based time series extraction. ABIDE is a benchmark for autism connectomics and machine learning-based disorder classification.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>ABIDE</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>7–64 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~85% male, ~15% female</td></tr>
+              <tr><th>Patient/Control</th><td>ASD patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Autism Spectrum Disorder (ASD)</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>1,112 (539 ASD, 573 controls)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>UCLA Consortium for Neuropsychiatric Phenomics (UCLA):</b>
+              272 subjects (multi-diagnostic), 3×3×4mm, TR=2000ms.
+            </summary>
+            <p>
+              The UCLA dataset comprises multimodal MRI and neuropsychological data for 272 adults (aged 21–50), including healthy controls and patients with schizophrenia, bipolar disorder, and ADHD. Resting-state and task-based fMRI (3×3×4 mm³, TR=2s) are included, with rich cognitive, behavioral, and clinical phenotype data. Imaging was acquired on Siemens Trio 3T scanners. Preprocessing includes motion correction, normalization, and ROI time series extraction. This dataset enables studies of transdiagnostic neural signatures and supports disease classification benchmarks.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>UCLA Phenomics</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI and tfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>Sternberg, Stroop, Stop-signal, Task-switching</td></tr>
+              <tr><th>Age Range</th><td>21–50 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~46% male, ~54% female</td></tr>
+              <tr><th>Patient/Control</th><td>Patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Schizophrenia, Bipolar Disorder, ADHD</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>272 (130 healthy, 72 schizophrenia, 35 bipolar, 35 ADHD)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Center for Biomedical Research Excellence (COBRE):</b>
+              173 subjects (schizophrenia and controls), 3.75×3.75×4.55mm, TR=2000ms.
+            </summary>
+            <p>
+              COBRE provides MRI data for 89 schizophrenia patients and 84 healthy controls (aged 18–65), recruited at a single US site. Imaging includes rsfMRI (3.75×3.75×4.55 mm³, TR=2s), T1 MRI, and clinical/behavioral measures. Preprocessing follows standard steps: motion correction, normalization, ROI time series extraction. This dataset is widely used for machine learning classification of schizophrenia and connectome analysis.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>COBRE</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>18–65 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~70% male, ~30% female</td></tr>
+              <tr><th>Patient/Control</th><td>Schizophrenia patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Schizophrenia</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>173 (89 patients, 84 controls)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Motor Neuron Disease fMRI Dataset (MND):</b>
+              59 participants (ALS and controls), 2.4mm, TR=2000ms, collected in Australia.
+            </summary>
+            <p>
+              The MND dataset features anatomical and resting-state fMRI (2.395×2.395×2.4mm³, TR=2s) from 59 subjects (36 with Amyotrophic Lateral Sclerosis—ALS, 23 controls), acquired at Herston Imaging Research Facility in Australia using Siemens Prisma 3T scanners. Detailed motor, cognitive, and clinical characterization is included. Imaging data are preprocessed (motion correction, normalization). This dataset is suitable for studying motor system degeneration and machine learning-based diagnosis.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>MND (Motor Neuron Disease)</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>Mean ~57 years (range 30–80)</td></tr>
+              <tr><th>Gender Ratio</th><td>44 male, 15 female</td></tr>
+              <tr><th>Patient/Control</th><td>ALS patients and controls</td></tr>
+              <tr><th>Disease Types</th><td>Amyotrophic Lateral Sclerosis (ALS)</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>59 (36 ALS, 23 controls)</td></tr>
+            </table>
+          </details>
+
+          <details>
+            <summary>
+              <b>Transdiagnostic Connectome Project (TCP):</b>
+              245 subjects with multiple psychiatric diagnoses (2mm, TR=800ms), harmonized imaging.
+            </summary>
+            <p>
+              The TCP dataset consists of 245 adults (aged 18–65) with a diverse range of psychiatric conditions (including mood, anxiety, and psychotic disorders), along with healthy controls, recruited at Yale and McLean (US). Resting-state fMRI (2mm³, TR=800ms) is harmonized across sites using Siemens Prisma scanners. All participants undergo the same comprehensive psychiatric diagnostic interviews (DSM-5), cognitive battery, and clinical assessments. Preprocessing mirrors HCP pipelines (motion correction, ICA-FIX, MNI registration, global signal regression), providing analysis-ready ROI-based functional connectivity and supporting transdiagnostic biomarker research.
+            </p>
+            <table border="1" cellpadding="4" style="border-collapse:collapse;">
+              <tr><th>Dataset Name</th><td>TCP (Transdiagnostic Connectome Project)</td></tr>
+              <tr><th>fMRI Types</th><td>rsfMRI</td></tr>
+              <tr><th>tfMRI Tasks</th><td>None</td></tr>
+              <tr><th>Age Range</th><td>18–65 years</td></tr>
+              <tr><th>Gender Ratio</th><td>~54% female, ~46% male</td></tr>
+              <tr><th>Patient/Control</th><td>Mixed: patients (multiple psychiatric diagnoses) and controls</td></tr>
+              <tr><th>Disease Types</th><td>Major depressive disorder, generalized anxiety, bipolar, psychotic disorders, etc.</td></tr>
+              <tr><th>Used in Tasks</th><td>Task 2 (phenotype prediction), Task 3 (disease diagnosis)</td></tr>
+              <tr><th>Sample Size</th><td>245</td></tr>
+            </table>
+          </details>
         </ul>
+
 
         <div class="container" style="margin-top:2em; margin-bottom:2em;">
           <div class="columns is-vcentered is-desktop">
@@ -448,7 +624,7 @@
 
 
 <!-- Supported downstream task -->
-<section class="hero is-light">
+<section class="hero is-white">
   <div class="hero-body">
     <div class="container">
       <h2 class="title">3. Supported Tasks</h2>
@@ -456,9 +632,11 @@
 
         <h3>1. Age and Gender Prediction</h3>
         <p>
-          This task evaluates the ability to predict demographic variables (age and biological sex) from resting-state fMRI (rsfMRI) sequences. It is a fundamental benchmark for assessing generalizable neural representations.
-          <br>
-          <b>How to use in NeuroSTORM:</b>
+          <b>Task Description:</b><br>
+          This task assesses the ability of models to predict basic demographic variables—chronological age and biological sex—using only resting-state fMRI (rsfMRI) sequences as input. The input is a preprocessed 4D rsfMRI sequence for each subject. The output is either a continuous age value (for regression) or a categorical label (male/female, for classification). Age and sex are fundamental variables correlated with brain structure and function, and accurate prediction indicates that brain representations capture meaningful demographic information. This task is widely used as a baseline for evaluating the generalizability and biological relevance of neural representations in fMRI analysis.
+        </p>
+        <details>
+          <summary>How to use in NeuroSTORM</summary>
           <ul>
             <li>
               <b>Sex classification (reported):</b><br>
@@ -469,13 +647,15 @@
               <code>--downstream_task_id 1 --downstream_task_type regression --task_name age</code>
             </li>
           </ul>
-        </p>
+        </details>
 
         <h3>2. Phenotype Prediction</h3>
         <p>
-          This task focuses on predicting various cognitive, behavioral, or clinical phenotype scores from fMRI data. Each phenotype (e.g., MMSE Score, Social Task Score, PANSS, DASS, etc.) can be selected as a regression target.
-          <br>
-          <b>How to use in NeuroSTORM:</b>
+          <b>Task Description:</b><br>
+          This task involves predicting quantitative or categorical phenotypic scores (such as cognitive, behavioral, or clinical measurements) from fMRI data. The input is a preprocessed fMRI sequence (rsfMRI or tfMRI) and the output is a continuous score (for regression) corresponding to the target phenotype. Example outputs include MMSE scores, PANSS scores, DASS measures, and other clinical or cognitive test results. This task provides a direct evaluation of how well neural representations capture individual differences in brain function related to cognition, emotion, or disease traits, and is critical for developing clinically useful neuroimaging biomarkers.
+        </p>
+        <details>
+          <summary>How to use in NeuroSTORM</summary>
           <ul>
             <li>
               <b>Phenotype regression:</b><br>
@@ -484,39 +664,103 @@
               Replace <code>your_score_name</code> with the phenotype to predict (e.g., <code>MMSE</code>, <code>PANSS_Positive</code>).
             </li>
           </ul>
-        </p>
+        </details>
+
+        <div class="container" style="margin-top:2em; margin-bottom:2em;">
+          <div class="columns is-vcentered is-desktop">
+            <div class="column has-text-centered">
+              <figure>
+                <img src="static/images/box1.png" alt="Phenotype label distributions in HCP-YA" style="max-width:100%; height:380px; object-fit:contain;"/>
+                <figcaption style="margin-top:0.5em; font-size:1em; color:#666;">
+                  Distribution of selected phenotype scores in the HCP-YA dataset.
+                </figcaption>
+              </figure>
+            </div>
+            <div class="column has-text-centered">
+              <figure>
+                <img src="static/images/box2.png" alt="Phenotype label distributions in TCP" style="max-width:100%; height:380px; object-fit:contain;"/>
+                <figcaption style="margin-top:0.5em; font-size:1em; color:#666;">
+                  Distribution of representative phenotype scores in the TCP dataset.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
 
         <h3>3. Disease Diagnosis</h3>
         <p>
-          This task consists of classifying subjects into diagnostic categories (e.g., healthy control vs. disorder) based on their fMRI data. It is applicable to datasets such as HCP-EP, ABIDE, ADHD200, COBRE, UCLA, and MND.
-          <br>
-          <b>How to use in NeuroSTORM:</b>
+          <b>Task Description:</b><br>
+          This task requires the model to assign each subject to a diagnostic category (e.g., healthy control, ADHD, schizophrenia, autism) based on their resting-state or task-based fMRI data. The input is a preprocessed fMRI sequence for each subject. The output is a categorical disease label. Disease diagnosis tasks are central for translational neuroimaging, as they test the capacity of models to extract pathological signatures from brain activity and are directly relevant to clinical decision support and biomarker discovery.
+        </p>
+        <details>
+          <summary>How to use in NeuroSTORM</summary>
           <ul>
             <li>
               <b>Disease classification:</b><br>
               <code>--downstream_task_id 3 --downstream_task_type classification --task_name diagnosis</code>
             </li>
           </ul>
-        </p>
+        </details>
 
         <h3>4. fMRI Retrieval</h3>
         <p>
-          This task explores the alignment between fMRI patterns and external semantic data (e.g. images, captions) for brain decoding and retrieval. <br>
-          <b>Support for this task in NeuroSTORM will be released soon.</b>
+          <b>Task Description:</b><br>
+          This task evaluates the ability of models to align fMRI activation patterns with external semantic information, such as images or textual descriptions. The input can be an fMRI sequence (e.g., recorded while viewing images) or a semantic embedding (e.g., image features). The output is the retrieval of matching semantic content given fMRI input, or vice versa. This task is foundational for brain decoding, neural representation alignment, and cross-modal retrieval, and is crucial for understanding how brain activity encodes semantic information.
         </p>
+        <p>
+          <b>Experimental Procedure:</b><br>
+          The fMRI retrieval experiment proceeds as follows:
+          <ol>
+            <li>
+              <b>Test Sample Selection:</b>
+              Randomly select 300 test samples from the NSD dataset. Each sample includes an fMRI sequence and its associated natural image.
+            </li>
+            <li>
+              <b>Compute Image Embeddings:</b>
+              For each image, compute its CLIP embedding to obtain a semantic feature representation.
+            </li>
+            <li>
+              <b>Candidate Pool Creation:</b>
+              For each test image, use its CLIP embedding to query the LAION-5B dataset, retrieving the top 16 most similar images as candidates.
+            </li>
+            <li>
+              <b>fMRI Embedding Extraction:</b>
+              Process each test fMRI sequence with the analysis model to obtain its embedding in the same feature space as CLIP.
+            </li>
+            <li>
+              <b>Similarity Computation and Retrieval:</b>
+              <ul>
+                <li>Compute cosine similarity between each fMRI embedding and the 16 candidate CLIP image embeddings. Select the image with the highest similarity as the retrieval result (brain-to-image retrieval).</li>
+                <li>For image-to-brain retrieval, use the image's CLIP embedding to retrieve the matching fMRI embedding from the pool of fMRI embeddings.</li>
+              </ul>
+            </li>
+            <li>
+              <b>Evaluation:</b>
+              Calculate top-1, top-3, and top-5 retrieval accuracy. Repeat the retrieval process multiple times to ensure statistical robustness.
+            </li>
+          </ol>
+        </p>
+        <details>
+          <summary>How to use in NeuroSTORM</summary>
+          <p>Support for this task in NeuroSTORM will be released soon.</p>
+        </details>
+
 
         <h3>5. Task-based fMRI State Classification</h3>
         <p>
-          This task evaluates the model's ability to classify cognitive state or task condition from task-based fMRI (tfMRI) sequences. For example, differentiating between emotion, language, or gambling task states in HCP-YA.
-          <br>
-          <b>How to use in NeuroSTORM:</b>
+          <b>Task Description:</b><br>
+          This task involves classifying which cognitive state or task condition a subject is in, based on their task-based fMRI (tfMRI) sequence. The input is a preprocessed tfMRI sequence corresponding to a specific cognitive experiment (e.g., language, emotion, gambling task). The output is a label indicating the task condition or cognitive state. Accurate state classification demonstrates that the model captures functionally relevant brain activation patterns, and this task is a key benchmark for evaluating generalization and sensitivity to cognitive manipulations in fMRI analysis.
+        </p>
+        <details>
+          <summary>How to use in NeuroSTORM</summary>
           <ul>
             <li>
               <b>State classification:</b><br>
               <code>--downstream_task_id 5 --downstream_task_type classification --task_name state_classification</code>
             </li>
           </ul>
-        </p>
+        </details>
+
 
       </div>
     </div>
