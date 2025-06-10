@@ -6,10 +6,10 @@
 
 <div align="center">
   <a href='LICENSE'><img src='https://img.shields.io/badge/license-MIT-yellow'></a>
-  <a href=''><img src='https://img.shields.io/badge/arXiv-fMRIFound-red'></a>  &nbsp;
-  <a href=''><img src='https://img.shields.io/badge/Project-fMRIFound-green'></a> &nbsp;
-  <a href=''><img src="https://img.shields.io/badge/GitHub-fMRIFound-9E95B7?logo=github"></a> &nbsp; 
-  <a href=''><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Model-fMRIFound-blue'></a> &nbsp; 
+  <a href='https://www.researchsquare.com/article/rs-6728658/v1'><img src='https://img.shields.io/badge/Preprint-NeuroSTORM-red'></a>  &nbsp;
+  <a href='https://cuhk-aim-group.github.io/NeuroSTORM/'><img src='https://img.shields.io/badge/Project-NeuroSTORM-green'></a> &nbsp;
+  <a href='https://github.com/CUHK-AIM-Group/NeuroSTORM'><img src="https://img.shields.io/badge/GitHub-NeuroSTORM-9E95B7?logo=github"></a> &nbsp; 
+  <a href=''><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Model-NeuroSTORM-blue'></a> &nbsp; 
   <br>
 </div>
 
@@ -29,6 +29,7 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 
 
 ## 🚀 Updates
+* __[2025.06.10]__: Release the [project website](https://cuhk-aim-group.github.io/NeuroSTORM/). Welcome to visit!
 * __[2025.02.13]__: Release the code of NeuroSTORM model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
 
 
@@ -36,13 +37,13 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 We highly recommend you to use our conda environment.
 ```bash
 # create virtual environment
-cd fMRIFound
-conda create -n fmrifound python=3.10
-conda activate fmrifound
+cd NeuroSTORM
+conda create -n neurostorm python=3.10
+conda activate neurostorm
 
 # upgrade gcc compiler (optional)
 conda install gcc_impl_linux-64=11.2.0
-ln -s /path/to/anaconda3/envs/fmrifound/libexec/gcc/x86_64-conda-linux-gnu/11.2.0/gcc /path/to/anaconda3/envs/fmrifound/bin/gcc
+ln -s /path/to/anaconda3/envs/neurostorm/libexec/gcc/x86_64-conda-linux-gnu/11.2.0/gcc /path/to/anaconda3/envs/neurostorm/bin/gcc
 conda install gxx_linux-64=11.2.0
 conda install ninja
 
@@ -77,7 +78,7 @@ Our directory structure looks like this:
 │   │   ├── reg_head.py                <- for regression tasks
 │   │   └── swift.py                   <- for contrastive learning
 │   ├── load_model.py                  <- load any backbone or head network
-│   ├── fmrifound.py                   <- fMRIFound
+│   ├── neurostorm.py                  <- NeuroSTORM
 │   ├── lightning_model.py             <- the basic lightning model class
 │   └── swift.py                       <- SwiFT
 │
@@ -106,7 +107,7 @@ First, please ensure that you have applied a primary processing pipeline, such a
 
 
 ```bash
-cd fMRIFound/datasets
+cd NeuroSTORM/datasets
 bash brain_extraction.sh /path/to/your/dataset /path/to/output/dataset
 ```
 
@@ -117,7 +118,7 @@ After that, we provide a tool to prepare your data for model input. With this to
 Here is an example of pre-processing HCP-YA dataset:
 
 ```bash
-cd fMRIFound/datasets
+cd NeuroSTORM/datasets
 python preprocessing_volume.py --dataset_name hcp --load_root ./data/hcp --save_root ./processed_data/hcp --num_processes 8
 ```
 
@@ -129,7 +130,7 @@ We recommend setting the number of processes to match the number of idle CPU cor
 If you need 2D ROIs data, we provide several available brain atlases and data conversion tools. You can process one or multiple datasets simultaneously and use one or multiple brain atlases at the same time. Here is an example:
 
 ```bash
-cd fMRIFound/datasets
+cd NeuroSTORM/datasets
 python generate_roi_data_from_nii.py --atlas_names aal3 cc200 --dataset_names hcp ucla --output_dir ./processed_data --num_processes 32
  ```
 
@@ -137,7 +138,7 @@ We recommend setting the number of processes to match the number of idle CPU cor
 
 
  ```bash
-cd fMRIFound/datasets
+cd NeuroSTORM/datasets
 # To be relased
  ```
 
@@ -149,8 +150,8 @@ cd fMRIFound/datasets
 You can use our prepared running scripts to quickly reproduce the experiments from the paper.
 
 ```bash
-cd fMRIFound
-bash scripts/hcp_downstream/ts_fmrifound_task2.sh
+cd NeuroSTORM
+bash scripts/hcp_downstream/ts_neurostorm_task2.sh
  ```
 
 
@@ -291,7 +292,7 @@ Unlike the pre-training scripts, different downstream tasks will have different 
 
 ```bash
 #!/bin/bash
-# bash scripts/hcp_downstream/ft_fmrifound_task1.sh task_name batch_size
+# bash scripts/hcp_downstream/ft_neurostorm_task1.sh task_name batch_size
 
 # Set default task_name
 task_name="sex"
@@ -317,7 +318,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using task_name
-project_name="hcp_ts_fmrifound_task1_${task_name}_train1.0"
+project_name="hcp_ts_neurostorm_task1_${task_name}_train1.0"
 
 python main.py \
   --accelerator gpu \
@@ -340,14 +341,14 @@ python main.py \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \
-  --model fmrifound \
+  --model neurostorm \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 20 \
   --img_size 96 96 96 20 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
-  --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt
+  --load_model_path ./output/neurostorm/pt_neurostorm_mae_ratio0.5.ckpt
  ```
 
 

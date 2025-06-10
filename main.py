@@ -52,8 +52,8 @@ def cli_main():
     project_name = args.project_name
     image_path = args.image_path
 
-    if args.model == "fmrifound":
-        category_dir = "fmrifound"
+    if args.model == "neurostorm":
+        category_dir = "neurostorm"
     elif args.model in ["swift", "tff"]:
         category_dir = "volume-based"
     elif args.model in ["braingnn", "bnt"]:
@@ -163,8 +163,8 @@ def cli_main():
         else:
             print('cannot find the ckpt file. try to download model from huggingface')
             repo_id = "zxcvb20001/fMRI-GPT"
-            if args.model == 'fmrifound':
-                filename = "fmrifound/{}".format(os.path.basename(args.load_model_path))
+            if args.model == 'neurostorm':
+                filename = "neurostorm/{}".format(os.path.basename(args.load_model_path))
             elif args.model in ['swift']:
                 filename = "volume-based/{}/{}".format(args.model, os.path.basename(args.load_model_path))
             

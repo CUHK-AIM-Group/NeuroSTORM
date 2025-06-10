@@ -34,8 +34,8 @@ __all__ = [
     "PatchMergingV2",
     "MERGING_MODE",
     "BasicLayer",
-    "fMRIFound",
-    "fMRIFoundMAE",
+    "NeuroSTORM",
+    "NeuroSTORMMAE",
 ]
 
 
@@ -718,7 +718,7 @@ class PositionalEmbedding(nn.Module):
 
         return x
 
-class fMRIFound(nn.Module):
+class NeuroSTORM(nn.Module):
     """
     Swin Transformer based on: "Liu et al.,
     Swin Transformer: Hierarchical Vision Transformer using Shifted Windows
@@ -917,7 +917,7 @@ class fMRIFound(nn.Module):
         return x
 
 
-class fMRIFoundMAE(nn.Module):
+class NeuroSTORMMAE(nn.Module):
     def __init__(
         self,
         img_size: Tuple,
