@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcp_downstream/ft_fmrifound_task2.sh score_name batch_size
+# bash scripts/hcp_downstream/ft_neurostorm_task2.sh score_name batch_size
 
 # Set default score_name
 score_name="MMSE_Score"
@@ -18,7 +18,7 @@ export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 
 # Construct project_name using score_name
-project_name="hcp_ts_fmrifound_task2_${score_name}_train1.0"
+project_name="hcp_ts_neurostorm_task2_${score_name}_train1.0"
 
 python main.py \
   --accelerator gpu \
@@ -41,7 +41,7 @@ python main.py \
   --dataset_split_num 1 \
   --seed 1 \
   --learning_rate 5e-5 \
-  --model fmrifound \
+  --model neurostorm \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 20 \
@@ -49,4 +49,4 @@ python main.py \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
   # --freeze_feature_extractor \
-  --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt
+  --load_model_path ./output/neurostorm/pt_neurostorm_mae_ratio0.5.ckpt

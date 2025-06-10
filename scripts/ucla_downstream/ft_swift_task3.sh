@@ -47,4 +47,4 @@ python main.py \
   --img_size 96 96 96 20 \
   --first_window_size 4 4 4 4 \
   --window_size 4 4 4 4 \
-  --load_model_path ./output/fmrifound/pt_fmrifound_mae_ratio0.5.ckpt
+  --load_model_path ./output/neurostorm/pt_neurostorm_mae_ratio0.5.ckpt

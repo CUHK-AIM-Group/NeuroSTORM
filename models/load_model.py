@@ -1,4 +1,4 @@
-from .fmrifound import fMRIFound, fMRIFoundMAE
+from .neurostorm import NeuroSTORM, NeuroSTORMMAE
 from .swift import SwiFT
 
 
@@ -6,9 +6,9 @@ def load_model(model_name, hparams=None):
     #number of transformer stages
     n_stages = len(hparams.depths)
 
-    if model_name == "fmrifound":
+    if model_name == "neurostorm":
         if hparams.pretraining:
-            net = fMRIFoundMAE(
+            net = NeuroSTORMMAE(
                 img_size=hparams.img_size,
                 in_chans=hparams.in_chans,
                 embed_dim=hparams.embed_dim,
@@ -27,7 +27,7 @@ def load_model(model_name, hparams=None):
                 time_mask=hparams.time_mask
             )
         else:
-            net = fMRIFound(
+            net = NeuroSTORM(
                 img_size=hparams.img_size,
                 in_chans=hparams.in_chans,
                 embed_dim=hparams.embed_dim,

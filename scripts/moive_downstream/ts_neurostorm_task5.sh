@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash scripts/hcptask_downstream/ts_fmrifound_task5.sh batch_size
+# bash scripts/hcptask_downstream/ts_neurostorm_task5.sh batch_size
 
 batch_size="12"
 
@@ -16,7 +16,7 @@ export NCCL_P2P_DISABLE=1
 export MASTER_PORT=29500
 
 # Construct project_name using score_name
-project_name="movie_ts_fmrifound_task5_train1.0"
+project_name="movie_ts_neurostorm_task5_train1.0"
 
 python main.py \
   --accelerator gpu \
@@ -40,7 +40,7 @@ python main.py \
   --dataset_split_num 2 \
   --seed 1 \
   --learning_rate 1e-3 \
-  --model fmrifound \
+  --model neurostorm \
   --depth 2 2 6 2 \
   --embed_dim 36 \
   --sequence_length 40 \
