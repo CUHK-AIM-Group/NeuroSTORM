@@ -531,7 +531,215 @@ class TransDiag(BaseDataset):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
                 data.append(data_tuple)
 
-        if self.train: 
+        if self.train:
             self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
-        
+
         return data
+
+
+class ADNI(BaseDataset):
+    """
+    ADNI dataset loader for AD vs CN classification from NIfTI files.
+
+    Data structure:
+    - Split files contain paths to .nii.gz files, one per line
+    - Labels are extracted from directory names in the path ('/ad/' or '/cn/')
+    - Each .nii.gz file is a preprocessed fMRI volume (already z-scored)
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _set_data(self, root, subject_dict):
+        """
+        Load ADNI dataset from file list.
+
+        Args:
+            root: Path to split file (e.g., adni_ad_mni_train.txt)
+            subject_dict: Dictionary mapping subject names to (sex, label)
+
+        Returns:
+            List of data tuples for the dataset
+        """
+        import nibabel as nib
+
+        data = []
+
+        # Read the split file
+        if not os.path.exists(root):
+            raise FileNotFoundError(f"Split file not found: {root}")
+
+        with open(root, 'r') as f:
+            file_paths = [line.strip() for line in f if line.strip()]
+
+        print(f"Loading {len(file_paths)} files from {root}")
+
+        for i, file_path in enumerate(file_paths):
+            if not os.path.exists(file_path):
+                print(f"Warning: File not found: {file_path}")
+                continue
+
+            # Extract label from path ('/ad/' or '/cn/')
+            if '/ad/' in file_path:
+                label = 1  # AD (Alzheimer's Disease)
+            elif '/cn/' in file_path:
+                label = 0  # CN (Cognitively Normal)
+            else:
+                print(f"Warning: Cannot extract label from path: {file_path}")
+                continue
+
+            # Extract subject name from filename
+            subject_name = os.path.basename(file_path).split('_')[0:3]
+            subject_name = '_'.join(subject_name)  # e.g., "ADNI_sub-035S6730_ses-01"
+
+            # For ADNI, we typically don't have sex info in the filename
+            # Set sex to -1 (unknown) unless provided in subject_dict
+            if subject_name in subject_dict:
+                sex, _ = subject_dict[subject_name]
+            else:
+                sex = -1  # Unknown
+
+            # Store the full file path instead of a directory
+            # We'll handle loading differently in __getitem__
+            # For now, use dummy values for num_frames (will load entire sequence)
+            data_tuple = (i, subject_name, file_path, 0, self.stride, 1, label, sex)
+            data.append(data_tuple)
+
+        if self.train:
+            self.target_values = np.array([tup[6] for tup in data]).reshape(-1, 1)
+
+        print(f"Loaded {len(data)} samples from ADNI dataset")
+        print(f"Label distribution: AD={sum([1 for d in data if d[6]==1])}, CN={sum([1 for d in data if d[6]==0])}")
+
+        return data
+
+    def load_sequence(self, file_path, start_frame, sample_duration, num_frames=None):
+        """
+        Load fMRI sequence from NIfTI file.
+
+        Args:
+            file_path: Path to .nii.gz file
+            start_frame: Starting time frame
+            sample_duration: Number of frames to load
+            num_frames: Total number of frames (ignored for NIfTI files)
+
+        Returns:
+            Tensor of shape [1, H, W, D, T]
+        """
+        import nibabel as nib
+        from scipy.ndimage import zoom
+
+        try:
+            # Load the NIfTI file
+            img = nib.load(file_path)
+            data = img.get_fdata()  # Shape: (H, W, D, T)
+
+            # Ensure data is 4D
+            if data.ndim == 3:
+                # If 3D, add time dimension
+                data = data[..., np.newaxis]
+
+            # Get the number of time points
+            total_frames = data.shape[-1]
+
+            # Select time frames
+            if self.contrastive or self.mae:
+                # For contrastive/MAE, select random subsequences
+                if start_frame + sample_duration > total_frames:
+                    # If not enough frames, repeat the last frames
+                    indices = list(range(start_frame, total_frames))
+                    while len(indices) < sample_duration:
+                        indices.append(total_frames - 1)
+                else:
+                    indices = list(range(start_frame, start_frame + sample_duration, self.stride_within_seq))
+
+                # Load main sequence
+                y = data[..., indices]
+
+                if self.mae:
+                    random_y = torch.zeros(1)
+                else:
+                    # For contrastive learning, select another random sequence
+                    full_range = np.arange(0, total_frames - sample_duration + 1)
+                    exclude_range = np.arange(start_frame - sample_duration, start_frame + sample_duration)
+                    available_choices = np.setdiff1d(full_range, exclude_range)
+
+                    if len(available_choices) > 0:
+                        random_start = np.random.choice(available_choices)
+                        random_indices = list(range(random_start, random_start + sample_duration, self.stride_within_seq))
+                        random_y = data[..., random_indices]
+                    else:
+                        # If not enough frames for a different sequence, use the same one
+                        random_y = y.copy()
+
+                    random_y = torch.from_numpy(random_y).float().unsqueeze(0)
+
+                y = torch.from_numpy(y).float().unsqueeze(0)
+                return (y, random_y)
+
+            else:
+                # For supervised learning, select contiguous frames
+                if self.shuffle_time_sequence:
+                    # Random sampling
+                    if total_frames >= sample_duration // self.stride_within_seq:
+                        indices = random.sample(list(range(total_frames)), sample_duration // self.stride_within_seq)
+                    else:
+                        indices = list(range(total_frames))
+                        while len(indices) < sample_duration // self.stride_within_seq:
+                            indices.append(total_frames - 1)
+                else:
+                    # Contiguous sampling
+                    if start_frame + sample_duration > total_frames:
+                        indices = list(range(start_frame, total_frames))
+                        while len(indices) < sample_duration // self.stride_within_seq:
+                            indices.append(total_frames - 1)
+                    else:
+                        indices = list(range(start_frame, start_frame + sample_duration, self.stride_within_seq))
+
+                y = data[..., indices]
+                y = torch.from_numpy(y).float().unsqueeze(0)
+
+                return y
+
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+            # Return a dummy tensor in case of error
+            if self.contrastive or self.mae:
+                dummy = torch.zeros(1, 91, 109, 91, sample_duration // self.stride_within_seq)
+                return (dummy, torch.zeros(1) if self.mae else dummy)
+            else:
+                return torch.zeros(1, 91, 109, 91, sample_duration // self.stride_within_seq)
+
+    def __getitem__(self, index):
+        """
+        Override __getitem__ to handle NIfTI file loading.
+        """
+        _, subject_name, file_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
+
+        if self.contrastive or self.mae:
+            y, rand_y = self.load_sequence(file_path, start_frame, sequence_length)
+            y = pad_to_96(y)
+            y = resize_volume(y, self.img_size)
+
+            if self.contrastive:
+                rand_y = pad_to_96(rand_y)
+                rand_y = resize_volume(rand_y, self.img_size)
+
+            return {
+                "fmri_sequence": (y, rand_y),
+                "subject_name": subject_name,
+                "target": target,
+                "TR": start_frame,
+                "sex": sex
+            }
+        else:
+            y = self.load_sequence(file_path, start_frame, sequence_length, num_frames)
+            y = pad_to_96(y)
+            y = resize_volume(y, self.img_size)
+
+            return {
+                "fmri_sequence": y,
+                "subject_name": subject_name,
+                "target": target,
+                "TR": start_frame,
+                "sex": sex,
+            }

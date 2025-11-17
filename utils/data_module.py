@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader, Subset
-from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag
+from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag, ADNI
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from .parser import str2bool
 
@@ -67,13 +67,15 @@ class fMRIDataModule(pl.LightningDataModule):
         elif self.hparams.dataset_name == 'HCPEP':
             return HCPEP
         elif self.hparams.dataset_name == 'GOD':
-            return GOD 
+            return GOD
         elif self.hparams.dataset_name == 'HCPTASK':
             return HCPTASK
         elif self.hparams.dataset_name == 'MOVIE':
             return MOVIE
         elif self.hparams.dataset_name == 'TransDiag':
             return TransDiag
+        elif self.hparams.dataset_name == 'ADNI':
+            return ADNI
         else:
             raise NotImplementedError
 
@@ -503,6 +505,13 @@ class fMRIDataModule(pl.LightningDataModule):
                 print(f"Target {category}: {count}")
             print('Load dataset TransDiag, {} subjects'.format(len(final_dict)))
 
+        elif self.hparams.dataset_name == "ADNI":
+            # For ADNI, we don't use metadata files
+            # Labels are extracted from file paths in the split files
+            # Return empty dict since ADNI dataset handles everything internally
+            print('ADNI dataset: metadata will be loaded from split files')
+            final_dict = {}
+
         return final_dict
 
     def setup(self, stage=None):
@@ -522,40 +531,69 @@ class fMRIDataModule(pl.LightningDataModule):
                 "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
                 "label_scaling_method": self.hparams.label_scaling_method,
                 "dtype": 'float16'}
-        
-        subject_dict = self.make_subject_dict()
-        
-        if os.path.exists(self.split_file_path):
-            train_names, val_names, test_names = self.load_split()
+
+        # Special handling for ADNI dataset
+        if self.hparams.dataset_name == "ADNI":
+            # For ADNI, image_path should point to the directory containing split files
+            # We pass the split file path directly as root parameter
+            train_split_file = os.path.join(self.hparams.image_path, "adni_ad_mni_train.txt")
+            val_split_file = os.path.join(self.hparams.image_path, "adni_ad_mni_val.txt")
+            test_split_file = os.path.join(self.hparams.image_path, "adni_ad_mni_test.txt")
+
+            # For ADNI, subject_dict is not used (labels are in file paths)
+            empty_dict = {}
+
+            params_train = params.copy()
+            params_train["root"] = train_split_file
+            params_val = params.copy()
+            params_val["root"] = val_split_file
+            params_test = params.copy()
+            params_test["root"] = test_split_file
+
+            self.train_dataset = Dataset(**params_train, subject_dict=empty_dict, use_augmentations=False, train=True)
+            self.val_dataset = Dataset(**params_val, subject_dict=empty_dict, use_augmentations=False, train=False)
+            self.test_dataset = Dataset(**params_test, subject_dict=empty_dict, use_augmentations=False, train=False)
+
+            print("ADNI dataset loaded:")
+            print("number of train samples:", len(self.train_dataset.data))
+            print("number of val samples:", len(self.val_dataset.data))
+            print("number of test samples:", len(self.test_dataset.data))
+
         else:
-            train_names, val_names, test_names = self.determine_split_randomly(subject_dict)
-        
-        if self.hparams.bad_subj_path:
-            bad_subjects = open(self.hparams.bad_subj_path, "r").readlines()
-            for bad_subj in bad_subjects:
-                bad_subj = bad_subj.strip()
-                if bad_subj in list(subject_dict.keys()):
-                    print(f'removing bad subject: {bad_subj}')
-                    del subject_dict[bad_subj]
-        
-        if self.hparams.limit_training_samples:
-            selected_num = int(self.hparams.limit_training_samples * len(train_names))
-            train_names = np.random.choice(train_names, size=selected_num, replace=False, p=None)
-        
-        train_dict = {key: subject_dict[key] for key in train_names if key in subject_dict}
-        val_dict = {key: subject_dict[key] for key in val_names if key in subject_dict}
-        test_dict = {key: subject_dict[key] for key in test_names if key in subject_dict}
-        
-        self.train_dataset = Dataset(**params, subject_dict=train_dict, use_augmentations=False, train=True)
-        self.val_dataset = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False) 
-        self.test_dataset = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
-        
-        print("number of train subjects:", len(train_dict))
-        print("number of val subjects:", len(val_dict))
-        print("number of test subjects:", len(test_dict))
-        print("number of train samples:", len(self.train_dataset.data))
-        print("number of val samples:", len(self.val_dataset.data))  
-        print("number of test samples:", len(self.test_dataset.data))
+            # Standard processing for other datasets
+            subject_dict = self.make_subject_dict()
+
+            if os.path.exists(self.split_file_path):
+                train_names, val_names, test_names = self.load_split()
+            else:
+                train_names, val_names, test_names = self.determine_split_randomly(subject_dict)
+
+            if self.hparams.bad_subj_path:
+                bad_subjects = open(self.hparams.bad_subj_path, "r").readlines()
+                for bad_subj in bad_subjects:
+                    bad_subj = bad_subj.strip()
+                    if bad_subj in list(subject_dict.keys()):
+                        print(f'removing bad subject: {bad_subj}')
+                        del subject_dict[bad_subj]
+
+            if self.hparams.limit_training_samples:
+                selected_num = int(self.hparams.limit_training_samples * len(train_names))
+                train_names = np.random.choice(train_names, size=selected_num, replace=False, p=None)
+
+            train_dict = {key: subject_dict[key] for key in train_names if key in subject_dict}
+            val_dict = {key: subject_dict[key] for key in val_names if key in subject_dict}
+            test_dict = {key: subject_dict[key] for key in test_names if key in subject_dict}
+
+            self.train_dataset = Dataset(**params, subject_dict=train_dict, use_augmentations=False, train=True)
+            self.val_dataset = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False)
+            self.test_dataset = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
+
+            print("number of train subjects:", len(train_dict))
+            print("number of val subjects:", len(val_dict))
+            print("number of test subjects:", len(test_dict))
+            print("number of train samples:", len(self.train_dataset.data))
+            print("number of val samples:", len(self.val_dataset.data))
+            print("number of test samples:", len(self.test_dataset.data))
         
         # DistributedSampler is internally called in pl.Trainer
         def get_params(train):
