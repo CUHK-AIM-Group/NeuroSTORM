@@ -125,9 +125,15 @@ class LightningModel(pl.LightningModule):
         if type(feature) == tuple:
             feature = feature[0]
 
+        head_features = None
+
         # Classification task
         if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
-            logits = self.output_head(feature).squeeze() #self.clf(feature).squeeze()
+            if self.hparams.task_name == 'fmri_reid' and hasattr(self.output_head, "forward_with_features"):
+                logits, head_features = self.output_head.forward_with_features(feature)
+            else:
+                logits = self.output_head(feature)
+            logits = logits.squeeze()
             target = target_value.float().squeeze()
         # Regression task
         elif self.hparams.downstream_task_type == 'regression':
@@ -138,7 +144,7 @@ class LightningModel(pl.LightningModule):
             elif self.hparams.label_scaling_method == 'minmax':
                 target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
         
-        return subj, logits, target
+        return subj, logits, target, head_features
     
     def _calculate_loss(self, batch, mode):
         if self.hparams.pretraining:
@@ -227,7 +233,7 @@ class LightningModel(pl.LightningModule):
             # print(f"Data time: {data_time:.6f} seconds")
 
             start_time_model = time.time()
-            subj, logits, target = self._compute_logits(batch, augment_during_training=self.hparams.augment_during_training)
+            subj, logits, target, _ = self._compute_logits(batch, augment_during_training=self.hparams.augment_during_training)
             end_time_model = time.time()
             model_time = end_time_model - start_time_model
             # print(f"Model time: {model_time:.6f} seconds")
@@ -342,6 +348,61 @@ class LightningModel(pl.LightningModule):
             self.log(f"{mode}_adjusted_mse", adjusted_mse, sync_dist=True) 
             self.log(f"{mode}_adjusted_mae", adjusted_mae, sync_dist=True) 
 
+    def _evaluate_reid(self, subj_array, features, targets, mode):
+        """Compute re-identification metrics (top1, mAP) using head features.
+
+        Args:
+            subj_array (np.ndarray): subject ids per sample (strings or ints).
+            features (Tensor): pooled features before final FC, shape (N, D).
+            targets (Tensor): target labels (same ordering as subj_array).
+        """
+        if features.numel() == 0:
+            self.log(f"{mode}_reid_top1", torch.tensor(0.0, device=features.device), sync_dist=True)
+            self.log(f"{mode}_reid_mAP", torch.tensor(0.0, device=features.device), sync_dist=True)
+            return
+
+        # Map subject ids to contiguous labels for retrieval evaluation
+        unique_subj = {s: idx for idx, s in enumerate(np.unique(subj_array))}
+        labels = torch.tensor([unique_subj[s] for s in subj_array], device=features.device)
+
+        feats = torch.nn.functional.normalize(features, dim=1)
+        sim_matrix = torch.matmul(feats, feats.t())
+        N = sim_matrix.size(0)
+        gallery_size = getattr(self.hparams, "reid_gallery_size", None)
+
+        top1_correct = 0.0
+        ap_sum = 0.0
+
+        for i in range(N):
+            sims = sim_matrix[i]
+            sims[i] = -float('inf')
+
+            if gallery_size is not None and gallery_size > 0:
+                k = min(int(gallery_size), N - 1)
+                indices = torch.topk(sims, k=k, largest=True).indices
+            else:
+                indices = torch.argsort(sims, descending=True)
+
+            retrieved_labels = labels[indices]
+            matches = (retrieved_labels == labels[i]).float()
+
+            if matches.numel() == 0:
+                continue
+
+            top1_correct += matches[0].item()
+
+            # Average Precision for this query
+            cumsum = torch.cumsum(matches, dim=0)
+            precision = cumsum / torch.arange(1, matches.numel() + 1, device=matches.device, dtype=torch.float)
+            ap = (precision * matches).sum() / matches.sum()
+            ap_sum += ap.item()
+
+        top1 = top1_correct / max(N, 1)
+        mAP = ap_sum / max(N, 1)
+
+        self.log(f"{mode}_reid_top1", torch.tensor(top1, device=features.device), sync_dist=True)
+        self.log(f"{mode}_reid_mAP", torch.tensor(mAP, device=features.device), sync_dist=True)
+
     def training_step(self, batch, batch_idx):
         loss = self._calculate_loss(batch, mode="train")
 
@@ -354,12 +415,12 @@ class LightningModel(pl.LightningModule):
             else:
                 self._calculate_loss(batch, mode="test")
         else:
-            subj, logits, target = self._compute_logits(batch)
+            subj, logits, target, head_features = self._compute_logits(batch)
             if self.hparams.downstream_task_type == 'multi_task':
                 output = torch.stack([logits[1].squeeze(), target], dim=1)
                 output = output.detach().cpu()
             else:
-                output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu()]
+                output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu(), None if head_features is None else head_features.detach().cpu()]
             
             return (subj, output)
 
@@ -440,23 +501,33 @@ class LightningModel(pl.LightningModule):
         if self.hparams.pretraining:
             self._calculate_loss(batch, mode="test")
         else:
-            subj, logits, target = self._compute_logits(batch)
-            output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu()]
+            subj, logits, target, head_features = self._compute_logits(batch)
+            output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu(), None if head_features is None else head_features.detach().cpu()]
 
             return (subj, output)
 
     def test_epoch_end(self, outputs):
         if not self.hparams.pretraining:
             subj_test = []
-            out_test_logits_list, out_test_target_list = [], []
+            out_test_logits_list, out_test_target_list, out_test_feat_list = [], [], []
             for subj, out in outputs:
                 subj_test += subj
                 out_test_logits_list.append(out[0])
                 out_test_target_list.append(out[1])
+                out_test_feat_list.append(out[2])
             subj_test = np.array(subj_test)
             total_out_test_logits = torch.cat(out_test_logits_list, dim=0)
             total_out_test_target = torch.cat(out_test_target_list, dim=0)
-            self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
+
+            if self.hparams.task_name == 'fmri_reid':
+                feat_list = [f for f in out_test_feat_list if f is not None]
+                if len(feat_list) == 0:
+                    self._evaluate_reid(subj_test, torch.empty((0, 0), device=total_out_test_target.device), total_out_test_target, mode="test")
+                else:
+                    total_out_test_feat = torch.cat(feat_list, dim=0)
+                    self._evaluate_reid(subj_test, total_out_test_feat, total_out_test_target, mode="test")
+            else:
+                self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
     
     def on_train_epoch_start(self) -> None:
         self.starter, self.ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -580,6 +651,7 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--last_layer_full_MSA", type=str2bool, default=False, help="whether to use full-scale multi-head self-attention at the last layers")
         group.add_argument("--clf_head_version", type=str, default="v1", help="clf head version, v2 has a hidden layer")
         group.add_argument("--attn_drop_rate", type=float, default=0, help="dropout rate of attention layers")
+        group.add_argument("--reid_gallery_size", type=int, default=None, help="Limit gallery size when evaluating re-identification (use all if unset)")
 
         # others
         group.add_argument("--scalability_check", action='store_true', help="whether to check scalability")

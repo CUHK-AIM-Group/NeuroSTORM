@@ -152,11 +152,18 @@ class fMRIDataModule(pl.LightningDataModule):
             subject_list = os.listdir(img_root)
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_gender.csv"))
             meta_data_residual = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_precise_age.csv"))
-            if self.hparams.task_name == 'sex': task_name = 'Gender'
-            elif self.hparams.task_name == 'age': task_name = 'age'
+            if self.hparams.task_name == 'sex':
+                task_name = 'Gender'
+            elif self.hparams.task_name == 'age':
+                task_name = 'age'
+            elif self.hparams.task_name == 'fmri_reid':
+                # re-identification uses subject id as class; we'll handle label mapping after collecting subjects
+                task_name = 'fmri_reid'
             # MMSE_Score Social_Task_Random_Perc_TOM CogTotalComp_Unadj Emotion_Task_Acc Language_Task_Acc Strength_Unadj 
-            elif self.hparams.downstream_task_id == 2: task_name = self.hparams.task_name
-            else: raise NotImplementedError()
+            elif self.hparams.downstream_task_id == 2:
+                task_name = self.hparams.task_name
+            else:
+                raise NotImplementedError()
 
             print('downstream_task_id = {}, task_name = {}'.format(self.hparams.downstream_task_id, task_name))
 
@@ -165,6 +172,9 @@ class fMRIDataModule(pl.LightningDataModule):
             elif task_name == 'age':
                 meta_task = meta_data_residual[['subject',task_name,'sex']].dropna()
                 meta_task = meta_task.rename(columns={'subject': 'Subject'})
+            elif task_name == 'fmri_reid':
+                # metadata not needed for labels; keep placeholder with Subject column for filtering
+                meta_task = pd.DataFrame({'Subject': meta_data['Subject'].dropna()})
             elif self.hparams.downstream_task_id == 2:
                 meta_task = meta_data[['Subject', task_name, 'Gender']].dropna()  
             
@@ -178,12 +188,35 @@ class fMRIDataModule(pl.LightningDataModule):
                         target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
                         sex = meta_task[meta_task["Subject"]==int(subject)]["sex"].values[0]
                         sex = 1 if sex == "M" else 0
+                    elif task_name == 'fmri_reid':
+                        # placeholder target; will be replaced by contiguous ids below
+                        target = 0
+                        # try to keep sex if available; default to 0 when missing
+                        if int(subject) in meta_data['Subject'].values:
+                            g = meta_data[meta_data["Subject"]==int(subject)]["Gender"].values
+                            if len(g) > 0:
+                                sex = 1 if g[0] == "M" else 0
+                            else:
+                                sex = 0
+                        else:
+                            sex = 0
                     elif self.hparams.downstream_task_id == 2:
                         target = meta_task[meta_task["Subject"]==int(subject)][task_name].values[0]
                         sex = meta_task[meta_task["Subject"]==int(subject)]["Gender"].values[0]
                         sex = 1 if sex == "M" else 0
                     final_dict[subject] = [sex, target]
             
+            # If reid task, remap subjects to contiguous class ids and keep mapping
+            if task_name == 'fmri_reid':
+                subj_sorted = sorted(final_dict.keys(), key=lambda x: int(x))
+                subj_to_label = {subj: idx for idx, subj in enumerate(subj_sorted)}
+                label_to_subj = {idx: subj for subj, idx in subj_to_label.items()}
+                for subj in subj_sorted:
+                    sex, _ = final_dict[subj]
+                    final_dict[subj] = [sex, subj_to_label[subj]]
+                self.reid_label_map = label_to_subj
+                self.reid_label_inverse = subj_to_label
+
             print('Load dataset HCP1200, {} subjects'.format(len(final_dict)))
             
         elif self.hparams.dataset_name == "ABCD":

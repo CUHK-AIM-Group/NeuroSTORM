@@ -29,12 +29,13 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 
 
 ## 🚀 Updates
+* __[2025.12.09]__: Release demo code, including automated data and model downloads. Performed age regression, gender classification, and phenotype prediction on sample data. Release the code for all benchmark tasks (task4).
 * __[2025.06.10]__: Release the [project website](https://cuhk-aim-group.github.io/NeuroSTORM/). Welcome to visit!
 * __[2025.02.13]__: Release the code of NeuroSTORM model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
 
 
 ## 1. How to install
-We highly recommend you to use our conda environment.
+We highly recommend that you use our conda environment. If your GPU uses the latest Blackwell architecture, lower versions of PyTorch are not supported. We suggest using CUDA 12.8 and PyTorch version 2.7.0 or above.
 ```bash
 # create virtual environment
 cd NeuroSTORM
@@ -101,13 +102,24 @@ Our directory structure looks like this:
 
 ## 3. Prepare Datasets
 
-### 3.1 Pre-processing
+### 3.1 Data Downloading
+We provide data download scripts for HCP-YA, including rfMRI, tfMRI, T1, and T2. Please register for an account on the official [HCP-YA project website](https://humanconnectome.org/study/hcp-young-adult/overview). Then use our scripts as follows:
+
+```bash
+cd ./scripts/dataset_download
+python download_HCP_1200_rfMRI.py --id your_aws_id --key your_aws_key --out_dir hcp_ya --cpu_worker 1
+python download_HCP_1200_tfMRI.py --id your_aws_id --key your_aws_key --out_dir hcp_ya --cpu_worker 1
+python download_HCP_1200_t1t2.py --id your_aws_id --key your_aws_key --out_dir hcp_ya --cpu_worker 1
+```
+
+
+### 3.2 Data Pre-processing
 
 First, please ensure that you have applied a primary processing pipeline, such as [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/), [fMRIPrep](https://fmriprep.org/en/stable/), or [HCP pipeline](https://github.com/Washington-University/HCPpipelines), and that your data has been aligned into MNI152 space. You can also use our provided shell script for brain extraction. It is based on FSL BET, so you need install [FSL tool](https://fsl.fmrib.ox.ac.uk/fsl/docs/#/). After running the script, brain mask files in the nii.gz format will be generated in the output directory.
 
 
 ```bash
-cd NeuroSTORM/datasets
+cd ./datasets
 bash brain_extraction.sh /path/to/your/dataset /path/to/output/dataset
 ```
 
@@ -125,37 +137,32 @@ python preprocessing_volume.py --dataset_name hcp --load_root ./data/hcp --save_
 We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. If you need to delete the original files to free up disk space, you can use `--delete_after_preprocess`, and the tool will delete the original data after processing each sequence. If you didn't delete them during runtime, you can run the tool again and use `--delete_nii`. The tool will check if preprocessed files exist in the output folder and then delete the original files.
 
 
-### 3.2 Convert 4D Volume to 2D ROIs data
+### 3.3 Converting 4D Volume to 2D ROIs data
 
 If you need 2D ROIs data, we provide several available brain atlases and data conversion tools. You can process one or multiple datasets simultaneously and use one or multiple brain atlases at the same time. Here is an example:
 
 ```bash
 cd NeuroSTORM/datasets
 python generate_roi_data_from_nii.py --atlas_names aal3 cc200 --dataset_names hcp ucla --output_dir ./processed_data --num_processes 32
- ```
+```
 
-We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. We also provide code for computing the Functional Correlation Matrix. For details, refer to [BrainGNN](https://github.com/LifangHe/BrainGNN_Pytorch/tree/main). You can use it by:
-
-
- ```bash
-cd NeuroSTORM/datasets
-# To be relased
- ```
+We recommend setting the number of processes to match the number of idle CPU cores to speed up processing. We also provide code for computing the Functional Correlation Matrix. For details, refer to [BrainGNN](https://github.com/LifangHe/BrainGNN_Pytorch/tree/main).
 
 
-## 4. Train model
+## 4. Quick Start & Demo
 
-### 4.0 Quick start
-
-You can use our prepared running scripts to quickly reproduce the experiments from the paper.
+We provide a simple demo that allows you to test NeuroSTORM on sample data for age regression, gender classification, and phenotype prediction. First, make sure you have downloaded the HCP-YA dataset. Then, edit the list file for the test data to include the subject IDs you want to run inference on. Finally, run the inference:
 
 ```bash
-cd NeuroSTORM
-bash scripts/hcp_downstream/ts_neurostorm_task2.sh
- ```
+sh scripts/run_demo.sh
+```
+
+You will see the model's performance results on your selected data. Please email Cheng Wang (chengwang@link.cuhk.edu.hk) with any questions regarding this demo.
 
 
-### 4.1 Customize pre-training scripts
+## 5. Train model
+
+### 5.1 Customize pre-training scripts
 Here is the arguments list of main.py
 
 ```
@@ -286,7 +293,7 @@ DataModule arguments:
 ```
 
 
-### 4.3 Customize fine-tuning scripts
+### 5.2 Customize fine-tuning scripts
 
 Unlike the pre-training scripts, different downstream tasks will have different input parameters. For example, in the Phenotype Prediction task, predictions are often made on different scores. To avoid creating too many scripts, you can use the score name as an input parameter for the script. Here is an example:
 
@@ -352,7 +359,7 @@ python main.py \
  ```
 
 
-## 5. How to ues your own dataset
+## 6. How to ues your own dataset
 
 First, please refer to the following links to pre-process fMRI sequences and align the fMRI data to MNI152 space or directly download processed fMRI data (please contact to the authors).
 - https://fmriprep.org/en/stable/
@@ -397,7 +404,7 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     ...
 ```
 
-## 5. How to use your own network
+## 7. How to use your own network
 
 You can easily create a new Python file in the models folder to define your model, just ensure the format of the forward function is correct. If additional inputs or outputs are needed, you'll need to modify `lightning_model.py`.
 
@@ -429,7 +436,7 @@ class NewModel(nn.Module):
 ```
 
 
-## 6. How to add a new down-stream task
+## 8. How to add a new down-stream task
 
 Defining a new task involves setting labels in the dataset and choosing the head net. First, define the corresponding dataset label format in the function `make_subject_dict` from `data_module.py`.
 
@@ -496,15 +503,17 @@ class cls_head(nn.Module):
 ```
 
 
-## 7. Pretrained model checkpoints
+## 9. Pretrained model checkpoints
 We have provided the checkpoint files on HuggingFace, so you can download these files to your working directory. Also, the code will try to download checkpoint files by HuggingFace API if it cannot find the checkpoint files locally.
 
 
 ## ✏️ Todo List
+- [x] Release code for task 4
+- [x] Release a demo for quick start
 - [ ] Release code for computing the Functional Correlation Matrix
-- [ ] Release code for task 4
 - [ ] Support for custmized mamba scanning startegies
 - [ ] Support for more pre-training startegies
+- [ ] Support for more fMRI analysis models
 
 
 ## Acknowledgements

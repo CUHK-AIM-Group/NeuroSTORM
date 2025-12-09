@@ -23,6 +23,13 @@ class cls_head_v1(nn.Module):
         x = self.head(x)
         # torch.Size([16, 1])
         return x
+
+    def forward_with_features(self, x):
+        x = x.flatten(start_dim=2).transpose(1, 2)
+        pooled = self.avgpool(x.transpose(1, 2))
+        feat = torch.flatten(pooled, 1)
+        logits = self.head(feat)
+        return logits, feat
     
 
 class cls_head_v2(nn.Module):
@@ -43,6 +50,14 @@ class cls_head_v2(nn.Module):
         x = self.head(x)
 
         return x
+
+    def forward_with_features(self, x):
+        x = x.flatten(start_dim=2).transpose(1, 2)
+        pooled = self.avgpool(x.transpose(1, 2))
+        pooled = torch.flatten(pooled, 1)
+        hidden = self.hidden(pooled)
+        logits = self.head(hidden)
+        return logits, hidden
 
 
 class TransformerEncoder(nn.Module):
@@ -90,6 +105,21 @@ class cls_head_v3(nn.Module):
         
         return x
 
+    def forward_with_features(self, x):
+        x = x.flatten(start_dim=2).transpose(1, 2)
+        B, L, C = x.shape
+        assert L == self.pos_embed.shape[1] - 1, f"Expected input with {self.pos_embed.shape[1] - 1} tokens, but got {L} tokens."
+        assert C == self.cls_token.shape[2], f"Expected input embedding size of {self.cls_token.shape[2]}, but got {C}."
+
+        cls_tokens = self.cls_token.expand(B, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.pos_embed[:, :L+1, :]
+        x = self.transformer_encoder(x)
+        cls_token_final = x[:, 0]
+        feat = self.mlp_head[0](cls_token_final)
+        logits = self.mlp_head[1](feat)
+        return logits, feat
+
 
 class cls_head(nn.Module):
     def __init__(self, version=1, num_classes=2, num_tokens=96):
@@ -103,3 +133,9 @@ class cls_head(nn.Module):
 
     def forward(self, x):
         return self.head(x)
+
+    def forward_with_features(self, x):
+        if hasattr(self.head, "forward_with_features"):
+            return self.head.forward_with_features(x)
+        logits = self.head(x)
+        return logits, None
