@@ -1,156 +1,212 @@
-'''
-This script downloads data from the Human Connectome Project - 1200 subjects release.
-'''
-# Import packages
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Download task-fMRI (tfMRI) runs from the HCP 1200 release.
+
+For every subject we try to download 14 files:
+    7 tasks  ×  LR / RL
+        WM, SOCIAL, RELATIONAL, MOTOR,
+        LANGUAGE, GAMBLING, EMOTION
+Example key (relative to .../<SID>/MNINonLinear/):
+    Results/tfMRI_WM_LR/tfMRI_WM_LR.nii.gz
+"""
+
 import argparse
 import os
+import csv
+import pickle
+from multiprocessing import Process
+from typing import List, Dict
+
 import boto3
 from boto3.s3.transfer import TransferConfig
-import pickle
-
-# Make module executable
+from botocore.exceptions import ClientError
 from tqdm import tqdm
 
 
-SERIES_MAP = {}
+# ----------------------------------------------------------------------
+# S3 constants
+# ----------------------------------------------------------------------
+S3_BUCKET_NAME = 'hcp-openaccess'
+S3_PREFIX      = 'HCP_1200'               # root folder in the bucket
 
 
-def length_transform(length):
-    if length > 1024 * 1024 * 1024:
-        print("length:{:.2f}GB".format(length / 1024 / 1024 / 1024))
-    elif length > 1024 * 1024:
-        print("length:{:.2f}MB".format(length / 1024 / 1024))
-    elif length > 1024:
-        print("length:{:.2f}KB".format(length / 1024))
-    else:
-        print("length:{}B".format(length))
+# ----------------------------------------------------------------------
+# Build relative path list for tfMRI
+# ----------------------------------------------------------------------
+def build_tfmri_relpaths() -> List[str]:
+    """Return 14 relative paths under MNINonLinear/Results/"""
+    tasks = ['WM', 'SOCIAL', 'RELATIONAL', 'MOTOR',
+             'LANGUAGE', 'GAMBLING', 'EMOTION']
+    relpaths = []
+    for task in tasks:
+        for run in ('LR', 'RL'):
+            rel = f'Results/tfMRI_{task}_{run}/tfMRI_{task}_{run}.nii.gz'
+            relpaths.append(rel)
+    return relpaths
 
 
-class download_process():
-    def __init__(self, length):
-        self.length = length
-        self.bar = tqdm(range(int(length / 1024)))
-
-    def precess(self, chunk):
-        self.bar.update(int(chunk / 1024))
-
-    def close(self):
-        self.bar.close()
+TFMRI_RELPATHS = build_tfmri_relpaths()
+EXPECTED_N = len(TFMRI_RELPATHS)           # 14
 
 
-def download_prs(chunk):
-    print(chunk)
+# ----------------------------------------------------------------------
+# Single process downloading
+# ----------------------------------------------------------------------
+def download_tfmri(
+    subjects: List[str],
+    out_dir: str,
+    aws_access_key_id: str,
+    aws_secret_access_key: str,
+    proc_idx: int = 0
+):
+    """
+    Download all tfMRI runs for `subjects`.
 
+    Missing files are recorded into CSV: missing_tfmri_<proc_idx>.csv
+    """
+    # S3 connection (per process)
+    s3 = boto3.resource(
+        's3',
+        aws_access_key_id     = aws_access_key_id,
+        aws_secret_access_key = aws_secret_access_key
+    )
+    bucket = s3.Bucket(S3_BUCKET_NAME)
 
-def process_subjects(subjects, bucket, config):
-    tbar = tqdm(total=len(subjects))
+    # Transfer configuration
+    GB = 1024 ** 3
+    config = TransferConfig(
+        max_concurrency   = 500,
+        multipart_threshold = int(0.01 * GB),
+        multipart_chunksize = int(0.01 * GB)
+    )
 
-    for subject_id in subjects:
-        download_success = 0
-        for object in bucket.objects.filter(Prefix='{}/{}/'.format(s3_prefix, subject_id)):
-            l = len('HCP_1200/{}/'.format(subject_id))
-            if l >= len(object.key):
+    # Missing recorder
+    missing_dict: Dict[str, List[str]] = {}
+
+    pbar = tqdm(
+        subjects,
+        position=proc_idx,
+        desc=f'Proc {proc_idx}',
+        leave=False
+    )
+
+    for sid in pbar:
+        base_prefix = f'{S3_PREFIX}/{sid}/MNINonLinear/'
+        got_cnt     = 0
+        missing     = []
+
+        for rel in TFMRI_RELPATHS:
+            s3_key = base_prefix + rel
+            # Use final filename (tfMRI_WM_LR.nii.gz) with subject id prefix
+            local_fname = os.path.join(
+                out_dir,
+                f'{sid}_{os.path.basename(rel)}'
+            )
+
+            # Skip if file already exists
+            if os.path.exists(local_fname):
+                got_cnt += 1
                 continue
-            filename = object.key[l:]
 
-            task_name = ['WM', 'SOCIAL', 'RELATIONAL', 'MOTOR', 'LANGUAGE', 'GAMBLING', 'EMOTION']
+            try:
+                bucket.download_file(s3_key, local_fname, Config=config)
+                got_cnt += 1
+            except ClientError:
+                missing.append(rel)
+            except Exception as e:
+                missing.append(rel)
+                print(f'[Warning][{sid}] Failed to download {s3_key}: {e}')
 
-            for task in task_name:
-                SERIES_MAP[task + 'LR'] = 'MNINonLinear/Results/tfMRI_{}_LR/tfMRI_{}_LR.nii.gz'.format(task, task)
-                SERIES_MAP[task + 'RL'] = 'MNINonLinear/Results/tfMRI_{}_RL/tfMRI_{}_RL.nii.gz'.format(task, task)
+        if missing:
+            missing_dict[sid] = missing
 
-            if filename in SERIES_MAP.values():
-                download_success += 1
-                output_name = os.path.join(out_dir, '{}_{}'.format(subject_id, filename.split('/')[-1]))
-                if not os.path.exists(output_name):
-                    bucket.download_file(object.key, output_name, Config=config)
-        
-        if download_success == 7:
-            print('subject {} is downloaded'.format(subject_id))
-        elif 0 < download_success < 7:
-            print('subject {} is downloaded, but some data is missing'.format(subject_id))
-        else:
-            print('subject {} is skipped'.format(subject_id))
-        tbar.update(1)
+        pbar.set_postfix({'ok': got_cnt})
 
-    tbar.close()
+    pbar.close()
 
-
-def run_process(single_process_func, subjects, bucket, config, cpu_worker_num=16):
-    from multiprocessing import Process
-
-    item_count = len(subjects)
-    interval = item_count / cpu_worker_num
-    process_pool = []
-
-    for i in range(cpu_worker_num):
-        start_index = int(i*interval)
-        end_index = int((i+1)*interval)
-        if i == cpu_worker_num - 1:
-            process_pool.append(Process(target=single_process_func, args=(subjects[start_index:], bucket, config,)))
-            print('Process {}: {} - end'.format(i, start_index))
-        else:
-            process_pool.append(Process(target=single_process_func, args=(subjects[start_index:end_index], bucket, config,)))
-            print('Process {}: {} - {}'.format(i, start_index, end_index))
-    [p.start() for p in process_pool]
-    [p.join() for p in process_pool]
-    [p.close() for p in process_pool]
+    # Dump missing list
+    if missing_dict:
+        csv_path = os.path.join(out_dir, f'missing_tfmri_{proc_idx}.csv')
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for sid, miss in missing_dict.items():
+                writer.writerow([sid] + miss)
+        print(f'[Process {proc_idx}] Missing files saved → {csv_path}')
 
 
+# ----------------------------------------------------------------------
+# Multiprocessing wrapper
+# ----------------------------------------------------------------------
+def run_processes(
+    subjects: List[str],
+    out_dir: str,
+    aws_access_key_id: str,
+    aws_secret_access_key: str,
+    workers: int
+):
+    if workers <= 1:
+        download_tfmri(subjects, out_dir,
+                       aws_access_key_id, aws_secret_access_key, 0)
+        return
+
+    total   = len(subjects)
+    step    = total // workers
+    procs: List[Process] = []
+
+    for idx in range(workers):
+        s = idx * step
+        e = total if idx == workers - 1 else (idx + 1) * step
+        sub_list = subjects[s:e]
+
+        p = Process(target=download_tfmri,
+                    args=(sub_list, out_dir,
+                          aws_access_key_id, aws_secret_access_key, idx))
+        p.daemon = True
+        p.start()
+        procs.append(p)
+
+    [p.join() for p in procs]
+
+
+# ----------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------
 if __name__ == '__main__':
-    # Init arparser
     parser = argparse.ArgumentParser(description=__doc__)
-
-    # Required arguments
-    parser.add_argument('--id', type=str)
-    parser.add_argument('--key', type=str)
-    parser.add_argument('-o', '--out_dir', required=True, type=str,
-                        help='Path to local folder to download files to')
-    parser.add_argument('--save_subject_id', action='store_true')
-    parser.add_argument('--cpu_worker', type=int, default=1)
-
+    parser.add_argument('--id',  required=True, type=str, help='AWS access key id')
+    parser.add_argument('--key', required=True, type=str, help='AWS secret access key')
+    parser.add_argument('--out_dir', required=True, type=str, help='Output directory')
+    parser.add_argument('--save_subject_id', action='store_true',
+                        help='Parse hcp.csv and save subject IDs to all_pid.pkl')
+    parser.add_argument('--cpu_worker', type=int, default=1,
+                        help='Number of parallel worker processes')
     args = parser.parse_args()
 
-    if not args.save_subject_id:
-        with open('all_pid.pkl', 'rb') as f:
-            subjects = pickle.load(f)
-    
+    # Prepare output dir --------------------------------------------------
     out_dir = os.path.abspath(args.out_dir)
+    os.makedirs(out_dir, exist_ok=True)
 
-    s3_bucket_name = 'hcp-openaccess'
-    s3_prefix = 'HCP_1200'
-    aws_access_key_id = args.id
-    aws_secret_access_key = args.key
-    s3 = boto3.resource('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
-    bucket = s3.Bucket(s3_bucket_name)
-
-    GB = 1024 ** 3
-    config = TransferConfig(max_concurrency=500, multipart_threshold=int(0.01 * GB), multipart_chunksize=int(0.01 * GB))
-
+    # Build / load subject list ------------------------------------------
     if args.save_subject_id:
-        import csv
-        
-        subjects = set()
-        csv_name = os.path.join('hcp.csv')
-        with open(csv_name, newline='') as csvfile:
-            csv_reader = csv.reader(csvfile)
-            row = next(csv_reader)
-
-            for row in csv_reader:
-                subject_id = row[0]
-                release = row[1]
-                subjects.add(subject_id)
-
-                # if not os.path.exists(out_dir + '/' + subject_id):
-                #     print('Could not find %s, creating now...' % out_dir + '/' + subject_id)
-                #     os.makedirs(out_dir + '/' + subject_id)
-        
-        subjects = list(subjects)
+        subj_set = set()
+        with open('hcp.csv', newline='') as f:
+            rdr = csv.reader(f)
+            next(rdr)
+            for row in rdr:
+                subj_set.add(row[0])
+        subjects = sorted(subj_set)
         with open('all_pid.pkl', 'wb') as f:
             pickle.dump(subjects, f, pickle.HIGHEST_PROTOCOL)
+        print(f'Saved {len(subjects)} subject IDs to all_pid.pkl')
+        exit(0)
     else:
-        if args.cpu_worker == 1:
-            process_subjects(subjects, bucket, config)
-        elif args.cpu_worker > 1:
-            run_process(process_subjects, subjects, bucket, config, args.cpu_worker)
-    
+        with open('all_pid.pkl', 'rb') as f:
+            subjects = pickle.load(f)
+
+    # Launch download -----------------------------------------------------
+    run_processes(subjects, out_dir,
+                  args.id, args.key,
+                  max(1, args.cpu_worker))
+
+    print('tfMRI download finished.')
