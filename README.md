@@ -29,6 +29,7 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 
 
 ## 🚀 Updates
+* __[2026.03.24]__: Our paper has been accepted by Nature Biomedical Engineering.
 * __[2025.12.09]__: Release demo code, including automated data and model downloads. Performed age regression, gender classification, and phenotype prediction on sample data. Release the code for all benchmark tasks (task4).
 * __[2025.06.10]__: Release the [project website](https://cuhk-aim-group.github.io/NeuroSTORM/). Welcome to visit!
 * __[2025.02.13]__: Release the code of NeuroSTORM model, (volume&ROI) data pre-processing, and benchmark (task1&2&3&5)
