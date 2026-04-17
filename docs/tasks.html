@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroSTORM | Supported Tasks</title>
+    <meta
+      name="description"
+      content="NeuroSTORM supported downstream tasks: age prediction, phenotype prediction, disease diagnosis, fMRI re-identification, and task state classification."
+    />
+    <meta property="og:title" content="NeuroSTORM - Tasks" />
+    <meta
+      property="og:description"
+      content="Explore 5 downstream tasks in NeuroSTORM for fMRI analysis including disease diagnosis and phenotype prediction."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://img.picui.cn/free/2025/06/10/6848379069d65.png" />
+    <meta name="theme-color" content="#1e90ff" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="static/images/icon.png">
+    <style>
+      :root {
+        --primary: #1e90ff;
+        --primary-dark: #1873d9;
+        --secondary: #ff6600;
+        --text: #2c3e50;
+        --text-light: #5a6c7d;
+        --bg: #ffffff;
+        --bg-light: #f8fbfc;
+        --border: #e0e6ed;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 2rem;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        font-weight: 700;
+        color: var(--text);
+        font-size: 1.25rem;
+      }
+
+      .brand img {
+        height: 2rem;
+      }
+
+      nav {
+        display: flex;
+        gap: 2rem;
+      }
+
+      nav a {
+        color: var(--text-light);
+        text-decoration: none;
+        transition: color 0.2s;
+        font-size: 0.95rem;
+      }
+
+      nav a:hover, nav a.active {
+        color: var(--primary);
+      }
+
+      .topbar-actions {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.375rem;
+        text-decoration: none;
+        font-size: 0.875rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        display: inline-block;
+      }
+
+      .btn {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border);
+      }
+
+      .btn.ghost:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        background: rgba(30, 144, 255, 0.05);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h2 {
+        font-size: 1.75rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h3 {
+        font-size: 1.1rem;
+        color: var(--primary);
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .lead {
+        font-size: 1.1rem;
+        color: var(--text-light);
+        margin-bottom: 2rem;
+        max-width: 800px;
+      }
+
+      .task-section {
+        margin: 2rem 0;
+        padding: 1.5rem;
+        border-left: 4px solid var(--primary);
+        background: var(--bg-light);
+        border-radius: 0.375rem;
+      }
+
+      .task-section h3 {
+        margin-top: 0;
+      }
+
+      .task-description {
+        margin: 1rem 0;
+        line-height: 1.8;
+      }
+
+      details {
+        margin: 1.5rem 0 0 0;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+        background: white;
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--primary);
+        padding: 0.5rem 0;
+      }
+
+      summary:hover {
+        color: var(--primary-dark);
+      }
+
+      code {
+        background: var(--bg-light);
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.2rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+      }
+
+      ol, ul {
+        margin-left: 1.5rem;
+        margin-top: 0.5rem;
+      }
+
+      li {
+        margin: 0.5rem 0;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-light);
+        font-size: 0.875rem;
+        margin-top: 3rem;
+      }
+
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 1.75rem;
+        }
+        nav {
+          display: none;
+        }
+        .task-section {
+          border-left-width: 3px;
+          padding: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="NeuroSTORM Home">
+        <img src="static/images/icon.png" alt="NeuroSTORM logo" />
+        <span>NeuroSTORM</span>
+      </a>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="datasets.html">Datasets</a>
+        <a href="tasks.html" class="active">Tasks</a>
+        <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank">GitHub</a>
+      </nav>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="mailto:chengwang@link.cuhk.edu.hk">Contact Us</a>
+      </div>
+    </header>
+
+    <main>
+      <h1>Supported Downstream Tasks</h1>
+      <p class="lead">
+        NeuroSTORM supports 5 core downstream tasks for fMRI analysis, each designed to evaluate different aspects of neural representation learning and model generalization. Below is a detailed description of each task with usage examples.
+      </p>
+
+      <section class="task-section">
+        <h3>1. Age and Gender Prediction</h3>
+        <p class="task-description">
+          <b>Task Description:</b><br>
+          This task assesses the ability of models to predict basic demographic variables—chronological age and biological sex—using only resting-state fMRI (rsfMRI) sequences as input. The input is a preprocessed 4D rsfMRI sequence for each subject. The output is either a continuous age value (for regression) or a categorical label (male/female, for classification). Age and sex are fundamental variables correlated with brain structure and function, and accurate prediction indicates that brain representations capture meaningful demographic information. This task is widely used as a baseline for evaluating the generalizability and biological relevance of neural representations in fMRI analysis.
+        </p>
+        <details>
+          <summary>🔧 How to use in NeuroSTORM</summary>
+          <ul>
+            <li>
+              <b>Sex classification:</b><br>
+              <code>--downstream_task_id 1 --downstream_task_type classification --task_name sex</code>
+            </li>
+            <li>
+              <b>Age prediction (regression):</b><br>
+              <code>--downstream_task_id 1 --downstream_task_type regression --task_name age</code>
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="task-section">
+        <h3>2. Phenotype Prediction</h3>
+        <p class="task-description">
+          <b>Task Description:</b><br>
+          This task involves predicting quantitative or categorical phenotypic scores (such as cognitive, behavioral, or clinical measurements) from fMRI data. The input is a preprocessed fMRI sequence (rsfMRI or tfMRI) and the output is a continuous score (for regression) corresponding to the target phenotype. Example outputs include MMSE scores, PANSS scores, DASS measures, and other clinical or cognitive test results. This task provides a direct evaluation of how well neural representations capture individual differences in brain function related to cognition, emotion, or disease traits, and is critical for developing clinically useful neuroimaging biomarkers.
+        </p>
+        <details>
+          <summary>🔧 How to use in NeuroSTORM</summary>
+          <ul>
+            <li>
+              <b>Phenotype regression:</b><br>
+              <code>--downstream_task_id 2 --downstream_task_type regression --task_name your_score_name</code>
+              <br>
+              Replace <code>your_score_name</code> with the phenotype to predict (e.g., <code>MMSE</code>, <code>PANSS_Positive</code>).
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="task-section">
+        <h3>3. Disease Diagnosis</h3>
+        <p class="task-description">
+          <b>Task Description:</b><br>
+          This task requires the model to assign each subject to a diagnostic category (e.g., healthy control, ADHD, schizophrenia, autism) based on their resting-state or task-based fMRI data. The input is a preprocessed fMRI sequence for each subject. The output is a categorical disease label. Disease diagnosis tasks are central for translational neuroimaging, as they test the capacity of models to extract pathological signatures from brain activity and are directly relevant to clinical decision support and biomarker discovery.
+        </p>
+        <p class="task-description">
+          <b>Supported Datasets for Task 3:</b>
+          <ul>
+            <li>ADHD-200: ADHD vs. Control</li>
+            <li>ABIDE: Autism vs. Control</li>
+            <li>COBRE: Schizophrenia vs. Control</li>
+            <li>HCP-EP: Early Psychosis vs. Control</li>
+            <li>UCLA: Multi-disorder classification (Schizophrenia, Bipolar, ADHD, Control)</li>
+            <li>TCP: Multi-psychiatric diagnosis classification</li>
+          </ul>
+        </p>
+        <details>
+          <summary>🔧 How to use in NeuroSTORM</summary>
+          <ul>
+            <li>
+              <b>Disease classification:</b><br>
+              <code>--downstream_task_id 3 --downstream_task_type classification --task_name diagnosis</code>
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="task-section">
+        <h3>4. fMRI Re-identification (ReID)</h3>
+        <p class="task-description">
+          <b>Task Description:</b><br>
+          This task evaluates the ability of models to produce discriminative, subject-specific embeddings from 4D fMRI volumes for identity matching. Under a closed-set protocol, each query fMRI sequence is matched against a non-overlapping gallery of fMRI sequences to retrieve the correct identity. This task tests whether the learned representation preserves individual-specific functional signatures and supports reliable similarity search in high-dimensional fMRI space.
+        </p>
+        <p class="task-description">
+          <b>Experimental Procedure:</b><br>
+        </p>
+        <ol style="margin-left: 1.5rem;">
+          <li>
+            <b>Dataset and Protocol:</b> Use a held-out split on HCP-YA. Construct a non-overlapping query set and a gallery set; in the paper, the gallery size is fixed at 100.
+          </li>
+          <li>
+            <b>Embedding Extraction:</b> Forward each 4D fMRI sequence once through the analysis model to obtain a single L2-normalized feature vector (subject embedding).
+          </li>
+          <li>
+            <b>Retrieval:</b> For each query embedding, perform exhaustive nearest-neighbor search in the gallery embedding space (standard NN in the normalized feature space).
+          </li>
+          <li>
+            <b>Evaluation Metrics:</b> Report Rank-1 Accuracy and mean Average Precision (mAP) over the full query set. Optionally vary the gallery size to adjust task difficulty.
+          </li>
+        </ol>
+        <details>
+          <summary>🔧 How to use in NeuroSTORM</summary>
+          <ul>
+            <li>
+              <b>fMRI re-identification (ReID):</b><br>
+              <code>--downstream_task_id 4 --downstream_task_type classification --task_name fmri_reid</code>
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section class="task-section">
+        <h3>5. Task-based fMRI State Classification</h3>
+        <p class="task-description">
+          <b>Task Description:</b><br>
+          This task involves classifying which cognitive state or task condition a subject is in, based on their task-based fMRI (tfMRI) sequence. The input is a preprocessed tfMRI sequence corresponding to a specific cognitive experiment (e.g., language, emotion, gambling task). The output is a label indicating the task condition or cognitive state. Accurate state classification demonstrates that the model captures functionally relevant brain activation patterns, and this task is a key benchmark for evaluating generalization and sensitivity to cognitive manipulations in fMRI analysis.
+        </p>
+        <p class="task-description">
+          <b>Supported Task Conditions:</b>
+          <ul>
+            <li>HCP-YA / HCP-A / HCP-D: Emotion, Gambling, Language, Motor, Relational, Social, Working Memory</li>
+            <li>UKB: Motor, Emotion, Social, Gambling, Relational</li>
+          </ul>
+        </p>
+        <details>
+          <summary>🔧 How to use in NeuroSTORM</summary>
+          <ul>
+            <li>
+              <b>Task state classification:</b><br>
+              <code>--downstream_task_id 5 --downstream_task_type classification --task_name state_classification</code>
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <h2>Task Selection Guide</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0; border: 1px solid var(--border);">
+        <thead style="background: var(--bg-light);">
+          <tr>
+            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Task</th>
+            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Type</th>
+            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Input Type</th>
+            <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid var(--primary); font-weight: 600; color: var(--primary);">Best For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem;">Age & Gender Prediction</td>
+            <td style="padding: 0.75rem;">Regression / Classification</td>
+            <td style="padding: 0.75rem;">rsfMRI</td>
+            <td style="padding: 0.75rem;">Evaluating representation quality and generalization</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem;">Phenotype Prediction</td>
+            <td style="padding: 0.75rem;">Regression</td>
+            <td style="padding: 0.75rem;">rsfMRI / tfMRI</td>
+            <td style="padding: 0.75rem;">Biomarker discovery and clinical translation</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem;">Disease Diagnosis</td>
+            <td style="padding: 0.75rem;">Classification</td>
+            <td style="padding: 0.75rem;">rsfMRI</td>
+            <td style="padding: 0.75rem;">Clinical decision support and disease understanding</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem;">fMRI ReID</td>
+            <td style="padding: 0.75rem;">Classification / Retrieval</td>
+            <td style="padding: 0.75rem;">rsfMRI</td>
+            <td style="padding: 0.75rem;">Testing individual-specific neural signatures</td>
+          </tr>
+          <tr>
+            <td style="padding: 0.75rem;">Task State Classification</td>
+            <td style="padding: 0.75rem;">Classification</td>
+            <td style="padding: 0.75rem;">tfMRI</td>
+            <td style="padding: 0.75rem;">Evaluating sensitivity to task-driven activation</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Custom Tasks</h2>
+      <p>
+        NeuroSTORM supports creating custom downstream tasks by:
+      </p>
+      <ol>
+        <li>
+          Defining the dataset label format in the <code>make_subject_dict</code> function from <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/utils/data_module.py" target="_blank">data_module.py</a>
+        </li>
+        <li>
+          Setting the task type by specifying <code>--downstream_task</code> in the script
+        </li>
+        <li>
+          Choosing a classification or regression head. For custom tasks, add a new head definition in <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/models/heads" target="_blank">models/heads</a>
+        </li>
+      </ol>
+    </main>
+
+    <footer>
+      <p>
+        NeuroSTORM © 2025 ·
+        <a href="http://www.ee.cuhk.edu.hk/~yxyuan/" target="_blank" rel="noreferrer">CUHK-AIM-Group</a>
+      </p>
+    </footer>
+  </body>
+</html>

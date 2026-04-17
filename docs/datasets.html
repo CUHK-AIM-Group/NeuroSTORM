@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroSTORM | Supported Datasets</title>
+    <meta
+      name="description"
+      content="NeuroSTORM supported neuroimaging datasets: 18+ publicly available fMRI datasets for pre-training and downstream analysis."
+    />
+    <meta property="og:title" content="NeuroSTORM - Datasets" />
+    <meta
+      property="og:description"
+      content="Explore 18+ supported fMRI datasets in NeuroSTORM including UKB, HCP, ABCD, and more."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://img.picui.cn/free/2025/06/10/6848379069d65.png" />
+    <meta name="theme-color" content="#1e90ff" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="static/images/icon.png">
+    <style>
+      :root {
+        --primary: #1e90ff;
+        --primary-dark: #1873d9;
+        --secondary: #ff6600;
+        --text: #2c3e50;
+        --text-light: #5a6c7d;
+        --bg: #ffffff;
+        --bg-light: #f8fbfc;
+        --border: #e0e6ed;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 2rem;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        font-weight: 700;
+        color: var(--text);
+        font-size: 1.25rem;
+      }
+
+      .brand img {
+        height: 2rem;
+      }
+
+      nav {
+        display: flex;
+        gap: 2rem;
+      }
+
+      nav a {
+        color: var(--text-light);
+        text-decoration: none;
+        transition: color 0.2s;
+        font-size: 0.95rem;
+      }
+
+      nav a:hover, nav a.active {
+        color: var(--primary);
+      }
+
+      .topbar-actions {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.375rem;
+        text-decoration: none;
+        font-size: 0.875rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        display: inline-block;
+      }
+
+      .btn {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border);
+      }
+
+      .btn.ghost:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        background: rgba(30, 144, 255, 0.05);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h2 {
+        font-size: 1.75rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h3 {
+        font-size: 1.1rem;
+        color: var(--primary);
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .lead {
+        font-size: 1.1rem;
+        color: var(--text-light);
+        margin-bottom: 2rem;
+        max-width: 800px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1.5rem 0;
+        border: 1px solid var(--border);
+        font-size: 0.95rem;
+      }
+
+      table thead {
+        background: var(--bg-light);
+      }
+
+      table th {
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--primary);
+        border-bottom: 2px solid var(--primary);
+      }
+
+      table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      table tr:hover {
+        background: var(--bg-light);
+      }
+
+      details {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+        background: var(--bg-light);
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--primary);
+        padding: 0.5rem 0;
+      }
+
+      summary:hover {
+        color: var(--primary-dark);
+      }
+
+      details[open] summary {
+        color: var(--primary-dark);
+        margin-bottom: 1rem;
+      }
+
+      details p {
+        margin: 0.75rem 0;
+        line-height: 1.7;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-light);
+        font-size: 0.875rem;
+        margin-top: 3rem;
+      }
+
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 1.75rem;
+        }
+        nav {
+          display: none;
+        }
+        table {
+          font-size: 0.85rem;
+        }
+        table th, table td {
+          padding: 0.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="NeuroSTORM Home">
+        <img src="static/images/icon.png" alt="NeuroSTORM logo" />
+        <span>NeuroSTORM</span>
+      </a>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="datasets.html" class="active">Datasets</a>
+        <a href="tasks.html">Tasks</a>
+        <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank">GitHub</a>
+      </nav>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="mailto:chengwang@link.cuhk.edu.hk">Contact Us</a>
+      </div>
+    </header>
+
+    <main>
+      <h1>Supported Datasets</h1>
+      <p class="lead">
+        NeuroSTORM supports a wide range of publicly available fMRI datasets for both pre-training and downstream analysis. Below is a comprehensive overview of 18+ datasets with details on subjects, resolution, TR, and scientific focus.
+      </p>
+
+      <h2>Dataset Overview Table</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Dataset Name (Abbreviation)</th>
+            <th>Subjects (Male/Female)</th>
+            <th>Spatial Resolution</th>
+            <th>TR (ms)</th>
+            <th>Homepage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>UK Biobank (UKB)</b></td>
+            <td>35,458 (16,733 / 18,725)</td>
+            <td>2.4 × 2.4 × 2.4 mm³</td>
+            <td>735</td>
+            <td><a href="https://www.ukbiobank.ac.uk/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Adolescent Brain Cognitive Development (ABCD)</b></td>
+            <td>9,448 (4,931 / 4,516)</td>
+            <td>2.4 × 2.4 × 2.4 mm³</td>
+            <td>800</td>
+            <td><a href="https://abcdstudy.org/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Human Connectome Project - Young Adult (HCP-YA)</b></td>
+            <td>1,206 (550 / 656)</td>
+            <td>2 × 2 × 2 mm³</td>
+            <td>720</td>
+            <td><a href="https://www.humanconnectome.org/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Human Connectome Project - Aging (HCP-A)</b></td>
+            <td>722 (319 / 403)</td>
+            <td>2 × 2 × 2 mm³</td>
+            <td>800</td>
+            <td><a href="https://www.humanconnectome.org/study/hcp-lifespan-aging" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Human Connectome Project - Development (HCP-D)</b></td>
+            <td>632 (293 / 339)</td>
+            <td>2 × 2 × 2 mm³</td>
+            <td>800</td>
+            <td><a href="https://www.humanconnectome.org/study/hcp-lifespan-development" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Human Connectome Project - Early Psychosis (HCP-EP)</b></td>
+            <td>176 (109 / 67)</td>
+            <td>2 × 2 × 2 mm³</td>
+            <td>800</td>
+            <td><a href="https://www.humanconnectome.org/study/hcp-early-psychosis" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>ADHD-200 Sample (ADHD200)</b></td>
+            <td>497 (321 / 176)</td>
+            <td>3 × 3 × 4 mm³</td>
+            <td>2000</td>
+            <td><a href="http://fcon_1000.projects.nitrc.org/indi/adhd200/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Autism Brain Imaging Data Exchange (ABIDE)</b></td>
+            <td>1,112 (948 / 164)</td>
+            <td>3 × 3 × 3 mm³</td>
+            <td>2000</td>
+            <td><a href="http://fcon_1000.projects.nitrc.org/indi/abide/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>UCLA Consortium for Neuropsychiatric Phenomics (UCLA)</b></td>
+            <td>261 (152 / 109)</td>
+            <td>3 × 3 × 4 mm³</td>
+            <td>2000</td>
+            <td><a href="https://openneuro.org/datasets/ds000030" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Center for Biomedical Research Excellence (COBRE)</b></td>
+            <td>173 (130 / 43)</td>
+            <td>3.75 × 3.75 × 4.55 mm³</td>
+            <td>2000</td>
+            <td><a href="https://fcon_1000.projects.nitrc.org/indi/retro/cobre.html" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Motor Neuron Disease fMRI Dataset (MND)</b></td>
+            <td>59 (44 / 15)</td>
+            <td>2.395 × 2.395 × 2.4 mm³</td>
+            <td>2000</td>
+            <td><a href="https://openneuro.org/datasets/ds005874/versions/1.1.0" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Transdiagnostic Connectome Project (TCP)</b></td>
+            <td>245 (102 / 143)</td>
+            <td>2 × 2 × 2 mm³</td>
+            <td>800</td>
+            <td><a href="https://openneuro.org/datasets/ds004215" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Healthy Brain Network (HBN)</b></td>
+            <td>~3,900+ (ongoing)</td>
+            <td>Varies (2.4–2.5 mm)</td>
+            <td>~800–1450</td>
+            <td><a href="https://fcon_1000.projects.nitrc.org/indi/cmi_healthy_brain_network/" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>Philadelphia Neurodevelopmental Cohort (PNC)</b></td>
+            <td>1,445 (701 / 744)</td>
+            <td>3 × 3 × 3 mm³</td>
+            <td>3000</td>
+            <td><a href="https://www.med.upenn.edu/bbl/philadelphianeurodevelopmentalcohort.html" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>REST-meta-MDD</b></td>
+            <td>2,428</td>
+            <td>Varies (25 cohorts)</td>
+            <td>Varies</td>
+            <td><a href="http://rfmri.org/REST-meta-MDD" target="_blank">Link</a></td>
+          </tr>
+          <tr>
+            <td><b>DMT &amp; Harmine Meditation (DMT-HAR-MED)</b></td>
+            <td>40 (22 / 18)</td>
+            <td>≈ 2 × 2 × 2 mm³</td>
+            <td>Varies</td>
+            <td><a href="https://openneuro.org/datasets/ds006644/versions/1.0.1" target="_blank">Link</a></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Detailed Dataset Descriptions</h2>
+
+      <details>
+        <summary><b>UK Biobank (UKB):</b> Large-scale population study with 35,458 subjects</summary>
+        <p>
+          The UK Biobank (UKB) is one of the world's largest population-based health resource projects, comprising extensive genetic, clinical, lifestyle, and imaging data from over 500,000 participants, of which more than 40,000 have multimodal brain MRI—including both resting-state and task-based fMRI scans. Initiated between 2006 and 2010, UKB focuses on adults aged 40–69, with repeated imaging on a subset, enabling longitudinal analyses. fMRI data are acquired on Siemens Skyra 3T scanners, with a resolution of 2.4×2.4×2.4 mm³, and a fast TR of 735ms. The dataset includes both rsfMRI (6 min scan) and tfMRI (motor, emotion, social, gambling, and relational tasks), plus comprehensive demographic, cognitive, and health phenotypes. Standardized preprocessing pipelines (including motion correction, ICA-FIX denoising, and registration to MNI152) are publicly available. UKB is widely used for large-scale brain-behavior association studies, disease risk modeling, and neuroimaging foundation model pre-training.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Adolescent Brain Cognitive Development (ABCD):</b> Longitudinal study of 9,448 children</summary>
+        <p>
+          The ABCD Study is the largest long-term study of brain development and child/adolescent health in the US. It follows over 11,800 children (9–10 at baseline) through adolescence, with repeated multimodal MRI, cognitive, behavioral, genetic, and environmental data collection. Neuroimaging includes high-resolution rsfMRI (2.4mm³, TR=800ms) and tfMRI (emotional, reward, cognitive tasks), harmonized across 21 sites and 3 major scanner vendors. Imaging pipelines are derived from HCP preprocessing (motion correction, normalization, artifact removal), with ROI time-series available (e.g., Schaefer atlas). ABCD supports studies of typical development, neuropsychiatric risk, and gene–brain–behavior relationships.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Human Connectome Project (HCP):</b> High-resolution multimodal imaging across lifespan</summary>
+        <p>
+          The HCP is an NIH initiative to map human brain connectivity with unprecedented detail. Three major lifespan datasets are available:
+          <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+            <li><b>HCP-YA:</b> 1,206 healthy young adults (22–37y), scanned at 3T and 7T. Imaging includes rsfMRI (2mm³, TR=720ms; 1 hour per subject), tfMRI (7 tasks: working memory, emotion, language, motor, gambling, relational, social), and dMRI. Extensively preprocessed: motion correction, ICA-FIX, MNI registration, surface/volumetric data.</li>
+            <li><b>HCP-A:</b> 725 adults aged 36–100, using similar MRI protocols. Focused on typical aging and age-related brain changes.</li>
+            <li><b>HCP-D:</b> 652 children and adolescents (ages 5–21), using harmonized imaging, enables developmental connectomics.</li>
+            <li><b>HCP-EP:</b> 252 subjects with early psychosis (schizophrenia, schizoaffective, bipolar) and controls for disease diagnosis research.</li>
+          </ul>
+          All datasets include rich behavioral, cognitive, and demographic data. Used widely for benchmarking machine learning, connectomics, and lifespan brain research.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>ADHD-200 Sample:</b> Multi-site data for ADHD biomarker discovery (973 participants)</summary>
+        <p>
+          The ADHD-200 Sample is a multi-center open dataset for ADHD biomarker discovery. It consists of 973 children and adolescents (ages 7–21) from 8 US and 4 Chinese sites, including both ADHD (combined, inattentive, hyperactive-impulsive) and typically developing controls. Imaging includes resting-state fMRI (3×3×4 mm³, TR=2s) and T1-weighted MRI. Phenotypic data covers diagnosis, ADHD subtype, IQ, age, sex, and clinical symptoms. Preprocessing pipelines (Athena, NIAK, others) are public, supporting motion correction, normalization, and ROI extraction. ADHD200 is widely used for benchmarking machine learning models for disease classification.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Autism Brain Imaging Data Exchange (ABIDE):</b> 1,112 ASD subjects across 17 sites</summary>
+        <p>
+          ABIDE collates resting-state fMRI and anatomical MRI from 1,112 subjects (539 with Autism Spectrum Disorder, 573 controls), ages 7–64, across 17 international sites. Imaging protocols are heterogeneous (typical: 3mm³, TR=2s). Extensive phenotypic/clinical data are included, covering ASD diagnosis, IQ, and behavioral scales. Preprocessing (multiple pipelines) includes normalization, head motion correction, nuisance regression, registration, and ROI-based time series extraction. ABIDE is a benchmark for autism connectomics and machine learning-based disorder classification.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>UCLA Consortium for Neuropsychiatric Phenomics:</b> Multi-diagnostic sample (272 subjects)</summary>
+        <p>
+          The UCLA dataset comprises multimodal MRI and neuropsychological data for 272 adults (aged 21–50), including healthy controls and patients with schizophrenia, bipolar disorder, and ADHD. Resting-state and task-based fMRI (3×3×4 mm³, TR=2s) are included, with rich cognitive, behavioral, and clinical phenotype data. Imaging was acquired on Siemens Trio 3T scanners. Preprocessing includes motion correction, normalization, and ROI time series extraction. This dataset enables studies of transdiagnostic neural signatures and supports disease classification benchmarks.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Center for Biomedical Research Excellence (COBRE):</b> Schizophrenia and controls (173 subjects)</summary>
+        <p>
+          COBRE provides MRI data for 89 schizophrenia patients and 84 healthy controls (aged 18–65), recruited at a single US site. Imaging includes rsfMRI (3.75×3.75×4.55 mm³, TR=2s), T1 MRI, and clinical/behavioral measures. Preprocessing follows standard steps: motion correction, normalization, ROI time series extraction. This dataset is widely used for machine learning classification of schizophrenia and connectome analysis.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Philadelphia Neurodevelopmental Cohort (PNC):</b> Youth cohort with deep phenotyping (1,445 scanned)</summary>
+        <p>
+          The PNC is a large-scale, community-based study of neurodevelopment and psychiatric risk in over 9,500 youths (ages 8–21) from the greater Philadelphia area, with a deeply phenotyped imaging subsample (n=1,445) providing multimodal MRI, including resting-state and task-based fMRI, structural MRI, DTI, and perfusion scans (ASL). All imaging was performed on a single Siemens TIM Trio 3T scanner using harmonized protocols. All participants received comprehensive computerized neurocognitive testing (CNB) and structured psychiatric assessment (GOASSESS), with rich demographic, medical, and clinical data. The imaging sample is balanced by age, sex, and race, providing a unique resource for developmental and transdiagnostic psychopathology research.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Healthy Brain Network (HBN):</b> Transdiagnostic developmental dataset (~3,900+ ongoing)</summary>
+        <p>
+          The Healthy Brain Network (HBN) is an ongoing open-data initiative from the Child Mind Institute, designed to capture a broad spectrum of childhood psychopathologies and typical development. Enrollment focuses on families where there are concerns about a child's mental health or learning challenges. HBN spans multiple scanning sites in the New York City area (Staten Island mobile 1.5T and several 3T facilities), offering resting-state fMRI, anatomical MRI, diffusion MRI, EEG, voice/video recordings, and extensive phenotypic data. The resting-state protocol and "naturalistic" movie-watching runs facilitate pediatric compliance and reduce head motion. Data are released with thorough quality control metrics and partially harmonized preprocessing.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>REST-meta-MDD:</b> Major depressive disorder multisite meta-analysis (2,428 subjects)</summary>
+        <p>
+          The REST-meta-MDD Project is the first initiative of the Depression Imaging Research Consortium (DIRECT), involving 25 R-fMRI cohorts from 17 hospitals in China. It comprises 2,428 participants—1,300 patients with major depressive disorder (MDD) and 1,128 normal controls—making it among the largest MDD resting-state fMRI datasets collected to date. Clinical and demographic data (e.g., first-episode drug-naïve MDD, recurrent MDD, medication status, illness duration, Hamilton Depression Rating Scale scores) are included, allowing investigation of pathophysiological mechanisms and potential biomarkers for diagnosis or treatment response.
+        </p>
+      </details>
+
+      <details>
+        <summary><b>Transdiagnostic Connectome Project (TCP):</b> Multi-psychiatric diagnosis study (245 subjects)</summary>
+        <p>
+          The TCP dataset consists of 245 adults (aged 18–65) with a diverse range of psychiatric conditions (including mood, anxiety, and psychotic disorders), along with healthy controls, recruited at Yale and McLean (US). Resting-state fMRI (2mm³, TR=800ms) is harmonized across sites using Siemens Prisma scanners. All participants undergo the same comprehensive psychiatric diagnostic interviews (DSM-5), cognitive battery, and clinical assessments. Preprocessing mirrors HCP pipelines, providing analysis-ready ROI-based functional connectivity and supporting transdiagnostic biomarker research.
+        </p>
+      </details>
+    </main>
+
+    <footer>
+      <p>
+        NeuroSTORM © 2025 ·
+        <a href="http://www.ee.cuhk.edu.hk/~yxyuan/" target="_blank" rel="noreferrer">CUHK-AIM-Group</a>
+      </p>
+    </footer>
+  </body>
+</html>
