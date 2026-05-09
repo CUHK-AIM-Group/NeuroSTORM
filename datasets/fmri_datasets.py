@@ -7,6 +7,7 @@ import numpy as np
 import random
 import math
 import pandas as pd
+import h5py
 
 
 def pad_to_96(y):
@@ -58,27 +59,49 @@ def resize_volume(y, target_size):
 
 class BaseDataset(Dataset):
     def __init__(self, **kwargs):
-        super().__init__()      
+        super().__init__()
         self.register_args(**kwargs)
         self.sample_duration = self.sequence_length * self.stride_within_seq
         self.stride = max(round(self.stride_between_seq * self.sample_duration), 1)
+        self._h5_handles = {}
         self.data = self._set_data(self.root, self.subject_dict)
 
-        # import ipdb; ipdb.set_trace()
-        # index = 0
-        # _, subject_name, subject_path, start_frame, sequence_length, num_frames, target, sex = self.data[index]
-        # y = self.load_sequence(subject_path, start_frame, sequence_length, num_frames)
-        # y = pad_to_96(y)
-        # y = resize_volume(y, self.img_size)
-    
     def register_args(self,**kwargs):
         for name, value in kwargs.items():
             setattr(self, name, value)
         self.kwargs = kwargs
+
+    def _detect_format(self, subject_path):
+        if hasattr(self, 'data_format') and self.data_format != 'auto':
+            return self.data_format
+        if os.path.isfile(os.path.join(subject_path, 'frames.h5')):
+            return 'h5'
+        return 'pt'
+
+    def _count_frames(self, subject_path):
+        fmt = self._detect_format(subject_path)
+        if fmt == 'h5':
+            h5_path = os.path.join(subject_path, 'frames.h5')
+            with h5py.File(h5_path, 'r') as h5f:
+                return len([k for k in h5f.keys() if k.startswith('frame_')])
+        return len([f for f in os.listdir(subject_path) if f.startswith('frame_') and f.endswith('.pt')])
+
+    def _load_frame(self, subject_path, fname):
+        fmt = self._detect_format(subject_path)
+        if fmt == 'h5' and fname.startswith('frame_'):
+            h5_path = os.path.join(subject_path, 'frames.h5')
+            if h5_path not in self._h5_handles:
+                self._h5_handles[h5_path] = h5py.File(h5_path, 'r')
+            h5f = self._h5_handles[h5_path]
+            key = fname.replace('.pt', '')
+            return torch.from_numpy(h5f[key][()]).unsqueeze(0)
+        else:
+            img_path = os.path.join(subject_path, fname)
+            return torch.load(img_path).unsqueeze(0)
     
-    def load_sequence(self, subject_path, start_frame, sample_duration, num_frames=None): 
+    def load_sequence(self, subject_path, start_frame, sample_duration, num_frames=None):
         if self.contrastive or self.mae:
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             y = []
             load_fnames = [f'frame_{frame}.pt' for frame in range(start_frame, start_frame+sample_duration, self.stride_within_seq)]
             if self.with_voxel_norm:
@@ -86,28 +109,27 @@ class BaseDataset(Dataset):
 
             last_y = None
             for fname in load_fnames:
-                img_path = os.path.join(subject_path, fname)
-
                 try:
-                    y_loaded = torch.load(img_path).unsqueeze(0)
+                    y_loaded = self._load_frame(subject_path, fname)
                     y.append(y_loaded)
                     last_y = y_loaded
                 except:
+                    img_path = os.path.join(subject_path, fname)
                     print('load {} failed'.format(img_path))
                     if last_y is None:
                         y.append(self.previous_last_y)
                         last_y = self.previous_last_y
                     else:
                         y.append(last_y)
-            
+
             self.previous_last_y = y[-1]
             y = torch.cat(y, dim=4)
-            
+
             if self.mae:
                 random_y = torch.zeros(1)
             else:
                 random_y = []
-                
+
                 full_range = np.arange(0, num_frames-sample_duration+1)
                 # exclude overlapping sub-sequences within a subject
                 exclude_range = np.arange(start_frame-sample_duration, start_frame+sample_duration)
@@ -119,23 +141,22 @@ class BaseDataset(Dataset):
 
                 last_y = None
                 for fname in load_fnames:
-                    img_path = os.path.join(subject_path, fname)
-
                     try:
-                        y_loaded = torch.load(img_path).unsqueeze(0)
+                        y_loaded = self._load_frame(subject_path, fname)
                         random_y.append(y_loaded)
                         last_y = y_loaded
                     except:
+                        img_path = os.path.join(subject_path, fname)
                         print('load {} failed'.format(img_path))
                         if last_y is None:
                             random_y.append(self.previous_last_y)
                             last_y = self.previous_last_y
                         else:
                             random_y.append(last_y)
-                
+
                 self.previous_last_y = y[-1]
                 random_y = torch.cat(random_y, dim=4)
-            
+
             return (y, random_y)
 
         else: # without contrastive learning
@@ -144,13 +165,12 @@ class BaseDataset(Dataset):
                 load_fnames = [f'frame_{frame}.pt' for frame in random.sample(list(range(0, num_frames)), sample_duration // self.stride_within_seq)]
             else:
                 load_fnames = [f'frame_{frame}.pt' for frame in range(start_frame, start_frame+sample_duration, self.stride_within_seq)]
-            
+
             if self.with_voxel_norm:
                 load_fnames += ['voxel_mean.pt', 'voxel_std.pt']
-                
+
             for fname in load_fnames:
-                img_path = os.path.join(subject_path, fname)
-                y_i = torch.load(img_path).unsqueeze(0)
+                y_i = self._load_frame(subject_path, fname)
                 y.append(y_i)
             y = torch.cat(y, dim=4)
             return y
@@ -204,7 +224,7 @@ class HCP1200(BaseDataset):
         for i, subject in enumerate(subject_dict):
             sex,target = subject_dict[subject]
             subject_path = os.path.join(img_root, subject)
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
@@ -229,7 +249,7 @@ class ABCD(BaseDataset):
             
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -253,7 +273,7 @@ class Cobre(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, subject_name)
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -277,7 +297,7 @@ class ADHD200(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -301,7 +321,7 @@ class UCLA(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -325,7 +345,7 @@ class HCPEP(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -349,7 +369,7 @@ class GOD(BaseDataset):
         for i, subject_name in enumerate(subject_dict):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, '{}'.format(subject_name))
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -376,7 +396,7 @@ class UKB(BaseDataset):
             
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
@@ -403,7 +423,7 @@ class HCPTASK(BaseDataset):
             sex, target = subject_dict[subject_name]
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
@@ -432,7 +452,7 @@ class UKB(BaseDataset):
             
             subject_path = os.path.join(img_root, subject_name)
 
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             if num_frames < self.stride:
                 import ipdb; ipdb.set_trace()
             session_duration = num_frames - self.sample_duration + 1
@@ -481,7 +501,7 @@ class MOVIE(BaseDataset):
         for i, subject in enumerate(subject_dict):
             sex, target = subject_dict[subject]
             subject_path = os.path.join(img_root, subject)
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)
@@ -525,7 +545,7 @@ class TransDiag(BaseDataset):
         for i, subject in enumerate(subject_dict):
             sex, target = subject_dict[subject]
             subject_path = os.path.join(img_root, subject)
-            num_frames = len(os.listdir(subject_path))
+            num_frames = self._count_frames(subject_path)
             session_duration = num_frames - self.sample_duration + 1
             for start_frame in range(0, session_duration, self.stride):
                 data_tuple = (i, subject, subject_path, start_frame, self.stride, num_frames, target, sex)

@@ -1,0 +1,16 @@
+dataset_name: HCPTASK
+image_path: ./data/HCPTASK_preprocessed
+image_path_fc: ./data/HCP1200
+
+tasks:
+  task5:
+    downstream_task_id: 5
+    task_name: state_classification
+    downstream_task_type: classification
+    num_classes: 7
+
+defaults:
+  dataset_split_num: 1
+  limit_training_samples: 1.0
+  sequence_length_override: 40
+  img_size_override: [96, 96, 96, 40]

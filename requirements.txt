@@ -1,0 +1,46 @@
+# Core dependencies
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+
+# Fix setuptools for pytorch-lightning compatibility
+setuptools<81
+
+# PyTorch Lightning
+pytorch-lightning==1.9.4
+
+# Monitoring and logging
+tensorboard
+tensorboardX
+neptune
+tqdm
+nvitop
+
+# Medical imaging
+monai
+nibabel
+nilearn
+
+# Scientific computing
+numpy
+scipy
+pandas
+scikit-learn
+
+# Graph neural networks (for BrainGNN, LG-GNN, IBGNN)
+torch-geometric
+# torch-scatter and torch-sparse require prebuilt wheels from PyG:
+#   pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
+
+# Data processing
+h5py
+deepdish
+
+# Development tools
+ipdb
+
+# Transformers (pinned for mamba-ssm 2.2.2 compatibility)
+transformers<=4.39.3
+
+# Note: mamba-ssm and causal-conv1d need to be installed from source
+# See README.md for installation instructions

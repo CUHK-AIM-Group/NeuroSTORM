@@ -1,0 +1,14 @@
+dataset_name: MOVIE
+image_path: ./data/MOVIE_preprocessed
+image_path_fc: ./data/HCP1200
+
+tasks:
+  task5:
+    downstream_task_id: 5
+    task_name: movie_classification
+    downstream_task_type: classification
+    num_classes: 5
+
+defaults:
+  dataset_split_num: 1
+  limit_training_samples: 1.0

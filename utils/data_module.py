@@ -2,10 +2,23 @@ import os
 import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, ConcatDataset
+from torch_geometric.data import DataLoader as GeometricDataLoader
 from datasets.fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag
+from datasets.roi_datasets import ROIDataset, FCDataset, FCGraphDataset
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from .parser import str2bool
+
+
+def _rank0_print(*args, **kwargs):
+    # DDP spawn re-executes main.py; those worker processes will have
+    # NEUROSTORM_IS_WORKER=1 set by the launcher. Skip their setup prints so
+    # we don't see every line twice.
+    if os.environ.get("NEUROSTORM_IS_WORKER") == "1":
+        return
+    if int(os.environ.get("LOCAL_RANK", "0")) != 0:
+        return
+    print(*args, **kwargs)
 
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import LabelEncoder
@@ -41,41 +54,96 @@ class fMRIDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.dataset_names, self.image_paths = self._parse_dataset_specs()
+        if len(self.dataset_names) > 1 and not self.hparams.pretraining:
+            raise ValueError(
+                "Multiple datasets via --dataset_name are only supported in --pretraining mode. "
+                f"Got dataset_name={self.hparams.dataset_name} without --pretraining."
+            )
+
         # generate splits folder
         if self.hparams.pretraining:
-            split_dir_path = f'./data/splits/{self.hparams.dataset_name}/pretraining'
+            # per-dataset split paths so each dataset keeps its own subject list
+            self.split_file_paths = []
+            for name in self.dataset_names:
+                split_dir_path = f'./data/splits/{name}/pretraining'
+                os.makedirs(split_dir_path, exist_ok=True)
+                self.split_file_paths.append(
+                    os.path.join(split_dir_path, f"split_fixed_{self.hparams.dataset_split_num}.txt")
+                )
+            # keep legacy attribute pointing at the first dataset's split for backward compat
+            self.split_file_path = self.split_file_paths[0]
         else:
-            split_dir_path = f'./data/splits/{self.hparams.dataset_name}'
-        os.makedirs(split_dir_path, exist_ok=True)
-        self.split_file_path = os.path.join(split_dir_path, f"split_fixed_{self.hparams.dataset_split_num}.txt")
-        
+            split_dir_path = f'./data/splits/{self.dataset_names[0]}'
+            os.makedirs(split_dir_path, exist_ok=True)
+            self.split_file_path = os.path.join(split_dir_path, f"split_fixed_{self.hparams.dataset_split_num}.txt")
+            self.split_file_paths = [self.split_file_path]
+
+        self._is_setup = False
         self.setup()
 
-    def get_dataset(self):
-        if self.hparams.dataset_name == "HCP1200":
+    def _parse_dataset_specs(self):
+        """Parse --dataset_name / --image_path into aligned lists.
+
+        Both arguments accept comma-separated strings in pretraining mode.
+        If a single image_path is provided for multiple datasets we raise,
+        since each dataset lives in its own root directory.
+        """
+        raw_names = str(self.hparams.dataset_name)
+        names = [n.strip() for n in raw_names.split(',') if n.strip()]
+
+        raw_paths = self.hparams.image_path
+        if raw_paths is None:
+            paths = [None] * len(names)
+        else:
+            paths = [p.strip() for p in str(raw_paths).split(',') if p.strip()]
+
+        if len(names) > 1:
+            if len(paths) != len(names):
+                raise ValueError(
+                    f"--dataset_name has {len(names)} entries but --image_path has {len(paths)}. "
+                    "Pass a comma-separated --image_path with one root per dataset."
+                )
+        else:
+            # single dataset: keep the path list aligned (may contain a single entry)
+            if len(paths) == 0:
+                paths = [None]
+            elif len(paths) != 1:
+                # user listed multiple paths but a single dataset name - unusual, keep first
+                paths = paths[:1]
+
+        return names, paths
+
+    def get_dataset(self, dataset_name=None):
+        name = dataset_name if dataset_name is not None else self.dataset_names[0]
+        if name == "HCP1200":
             return HCP1200
-        elif self.hparams.dataset_name == "ABCD":
+        elif name == "ABCD":
             return ABCD
-        elif self.hparams.dataset_name == 'UKB':
+        elif name == 'UKB':
             return UKB
-        elif self.hparams.dataset_name == 'Cobre':
+        elif name in ('HCPA', 'HCPD'):
+            # HCPA / HCPD share the HCP-style directory layout and are only
+            # used for pretraining today, so reuse the HCP1200 wrapper.
+            return HCP1200
+        elif name == 'Cobre':
             return Cobre
-        elif self.hparams.dataset_name == 'ADHD200':
+        elif name == 'ADHD200':
             return ADHD200
-        elif self.hparams.dataset_name == 'UCLA':
+        elif name == 'UCLA':
             return UCLA
-        elif self.hparams.dataset_name == 'HCPEP':
+        elif name == 'HCPEP':
             return HCPEP
-        elif self.hparams.dataset_name == 'GOD':
-            return GOD 
-        elif self.hparams.dataset_name == 'HCPTASK':
+        elif name == 'GOD':
+            return GOD
+        elif name == 'HCPTASK':
             return HCPTASK
-        elif self.hparams.dataset_name == 'MOVIE':
+        elif name == 'MOVIE':
             return MOVIE
-        elif self.hparams.dataset_name == 'TransDiag':
+        elif name == 'TransDiag':
             return TransDiag
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Unsupported dataset: {name}")
 
     def convert_subject_list_to_idx_list(self, train_names, val_names, test_names, subj_list):
         subj_idx = np.array([str(x[1]) for x in subj_list])
@@ -87,26 +155,27 @@ class fMRIDataModule(pl.LightningDataModule):
         
         return train_idx, val_idx, test_idx
     
-    def save_split(self, sets_dict):
-        with open(self.split_file_path, "w+") as f:
+    def save_split(self, sets_dict, split_file_path=None):
+        path = split_file_path if split_file_path is not None else self.split_file_path
+        with open(path, "w+") as f:
             for name, subj_list in sets_dict.items():
                 f.write(name + "\n")
                 for subj_name in subj_list:
                     f.write(str(subj_name) + "\n")
-                    
-    def determine_split_randomly(self, S):
+
+    def determine_split_randomly(self, S, split_file_path=None):
         np.random.seed(0)
         S_keys = list(S.keys())
         S_train = int(len(S_keys) * self.hparams.train_split)
         S_val = int(len(S_keys) * self.hparams.val_split)
-        
+
         if self.hparams.downstream_task_type == 'classification':
             S_train = select_elements(S, S_train)
             S_remaining = {k: v for k, v in S.items() if k not in S_train}
             S_train_keys = list(S_train.keys())
         else:
             S_train_keys = np.random.choice(S_keys, S_train, replace=False)
-        
+
         remaining_keys = np.setdiff1d(S_keys, S_train_keys)
 
         if self.hparams.downstream_task_type == 'classification':
@@ -119,16 +188,17 @@ class fMRIDataModule(pl.LightningDataModule):
             S_val_keys = np.random.choice(remaining_keys, S_val, replace=False)
             if self.hparams.val_split + self.hparams.train_split < 1:
                 S_test_keys = np.setdiff1d(S_keys, np.concatenate([S_train_keys, S_val_keys]))
-        
+
         if self.hparams.val_split + self.hparams.train_split < 1:
-            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_test_keys})
+            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_test_keys}, split_file_path)
             return S_train_keys, S_val_keys, S_test_keys
         else:
-            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_val_keys})
+            self.save_split({"train_subjects": S_train_keys, "val_subjects": S_val_keys, "test_subjects": S_val_keys}, split_file_path)
             return S_train_keys, S_val_keys, S_val_keys
-    
-    def load_split(self):
-        subject_order = open(self.split_file_path, "r").readlines()
+
+    def load_split(self, split_file_path=None):
+        path = split_file_path if split_file_path is not None else self.split_file_path
+        subject_order = open(path, "r").readlines()
         subject_order = [x[:-1] for x in subject_order]
         train_index = np.argmax(["train" in line for line in subject_order])
         val_index = np.argmax(["val" in line for line in subject_order])
@@ -144,7 +214,40 @@ class fMRIDataModule(pl.LightningDataModule):
         return
     
     # filter subjects with metadata and pair subject names with their target values (+ sex)
-    def make_subject_dict(self):
+    def make_subject_dict(self, dataset_name=None, image_path=None):
+        """Build the {subject_id: [sex, target]} mapping for one dataset.
+
+        When ``dataset_name`` / ``image_path`` are provided we temporarily swap
+        the corresponding hparams so the per-dataset branches below keep
+        reading from ``self.hparams`` unchanged.
+        """
+        swapped = False
+        if dataset_name is not None or image_path is not None:
+            prev_name = self.hparams.dataset_name
+            prev_path = self.hparams.image_path
+            if dataset_name is not None:
+                self.hparams.dataset_name = dataset_name
+            if image_path is not None:
+                self.hparams.image_path = image_path
+            swapped = True
+
+        try:
+            # Fast path for pretraining: labels are not used by MAE / contrastive,
+            # so we skip metadata parsing and accept every subject directory.
+            if self.hparams.pretraining:
+                img_root = os.path.join(self.hparams.image_path, 'img')
+                final_dict = {subj: [0, 0] for subj in sorted(os.listdir(img_root))}
+                _rank0_print('Load dataset {} for pretraining, {} subjects'.format(
+                    self.hparams.dataset_name, len(final_dict)))
+                return final_dict
+
+            return self._make_subject_dict_with_labels()
+        finally:
+            if swapped:
+                self.hparams.dataset_name = prev_name
+                self.hparams.image_path = prev_path
+
+    def _make_subject_dict_with_labels(self):
         img_root = os.path.join(self.hparams.image_path, 'img')
         final_dict = dict()
 
@@ -216,6 +319,7 @@ class fMRIDataModule(pl.LightningDataModule):
                     final_dict[subj] = [sex, subj_to_label[subj]]
                 self.reid_label_map = label_to_subj
                 self.reid_label_inverse = subj_to_label
+                self.hparams.num_classes = len(subj_sorted)
 
             print('Load dataset HCP1200, {} subjects'.format(len(final_dict)))
             
@@ -538,31 +642,74 @@ class fMRIDataModule(pl.LightningDataModule):
 
         return final_dict
 
-    def setup(self, stage=None):
-        Dataset = self.get_dataset()
-        params = {
-                "root": self.hparams.image_path,
-                "img_size": self.hparams.img_size,
-                "sequence_length": self.hparams.sequence_length,
-                "contrastive": self.hparams.use_contrastive,
-                "contrastive_type": self.hparams.contrastive_type,
-                "mae": self.hparams.use_mae,
-                "stride_between_seq": self.hparams.stride_between_seq,
-                "stride_within_seq": self.hparams.stride_within_seq,
-                "with_voxel_norm": self.hparams.with_voxel_norm,
-                "downstream_task_id": self.hparams.downstream_task_id,
-                "task_name": self.hparams.task_name,
-                "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
-                "label_scaling_method": self.hparams.label_scaling_method,
-                "dtype": 'float16'}
-        
-        subject_dict = self.make_subject_dict()
-        
-        if os.path.exists(self.split_file_path):
-            train_names, val_names, test_names = self.load_split()
+    def _build_params(self, data_type, image_path):
+        if data_type == 'voxel':
+            Dataset = self.get_dataset()  # resolved per-dataset in the caller
+            params = {
+                    "root": image_path,
+                    "img_size": self.hparams.img_size,
+                    "sequence_length": self.hparams.sequence_length,
+                    "contrastive": self.hparams.use_contrastive,
+                    "contrastive_type": self.hparams.contrastive_type,
+                    "mae": self.hparams.use_mae,
+                    "stride_between_seq": self.hparams.stride_between_seq,
+                    "stride_within_seq": self.hparams.stride_within_seq,
+                    "with_voxel_norm": self.hparams.with_voxel_norm,
+                    "downstream_task_id": self.hparams.downstream_task_id,
+                    "task_name": self.hparams.task_name,
+                    "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
+                    "label_scaling_method": self.hparams.label_scaling_method,
+                    "data_format": self.hparams.data_format,
+                    "dtype": 'float16'}
+        elif data_type == 'roi':
+            Dataset = ROIDataset
+            params = {
+                    "root": image_path,
+                    "atlas_name": getattr(self.hparams, 'atlas_name', 'cc200'),
+                    "sequence_length": getattr(self.hparams, 'sequence_length', None),
+                    "stride": getattr(self.hparams, 'stride_within_seq', 1)}
+        elif data_type == 'fc':
+            Dataset = FCDataset
+            params = {
+                    "root": image_path,
+                    "atlas_name": getattr(self.hparams, 'atlas_name', 'cc200'),
+                    "fc_type": getattr(self.hparams, 'fc_type', 'correlation'),
+                    "return_format": getattr(self.hparams, 'fc_return_format', 'matrix')}
+        elif data_type == 'fc_bnt':
+            Dataset = FCDataset
+            params = {
+                    "root": image_path,
+                    "atlas_name": getattr(self.hparams, 'atlas_name', 'cc200'),
+                    "fc_type": getattr(self.hparams, 'fc_type', 'correlation'),
+                    "return_format": 'bnt'}
+        elif data_type == 'fc_graph':
+            Dataset = FCGraphDataset
+            params = {
+                    "root": image_path,
+                    "atlas_name": getattr(self.hparams, 'atlas_name', 'cc200'),
+                    "fc_type": getattr(self.hparams, 'fc_type', 'partial_correlation'),
+                    "threshold": getattr(self.hparams, 'fc_threshold', None)}
         else:
-            train_names, val_names, test_names = self.determine_split_randomly(subject_dict)
-        
+            raise ValueError(f"Unknown data_type: {data_type}")
+        return Dataset, params
+
+    def _build_single_dataset(self, dataset_name, image_path, split_file_path, data_type):
+        """Build train/val/test datasets for a single fMRI dataset."""
+        # Resolve the right Dataset class for this dataset name (voxel) while
+        # keeping the generic path for roi / fc variants.
+        if data_type == 'voxel':
+            Dataset = self.get_dataset(dataset_name)
+            _, params = self._build_params(data_type, image_path)
+        else:
+            Dataset, params = self._build_params(data_type, image_path)
+
+        subject_dict = self.make_subject_dict(dataset_name=dataset_name, image_path=image_path)
+
+        if os.path.exists(split_file_path):
+            train_names, val_names, test_names = self.load_split(split_file_path)
+        else:
+            train_names, val_names, test_names = self.determine_split_randomly(subject_dict, split_file_path)
+
         if self.hparams.bad_subj_path:
             bad_subjects = open(self.hparams.bad_subj_path, "r").readlines()
             for bad_subj in bad_subjects:
@@ -570,26 +717,61 @@ class fMRIDataModule(pl.LightningDataModule):
                 if bad_subj in list(subject_dict.keys()):
                     print(f'removing bad subject: {bad_subj}')
                     del subject_dict[bad_subj]
-        
+
         if self.hparams.limit_training_samples:
             selected_num = int(self.hparams.limit_training_samples * len(train_names))
             train_names = np.random.choice(train_names, size=selected_num, replace=False, p=None)
-        
+
         train_dict = {key: subject_dict[key] for key in train_names if key in subject_dict}
         val_dict = {key: subject_dict[key] for key in val_names if key in subject_dict}
         test_dict = {key: subject_dict[key] for key in test_names if key in subject_dict}
-        
-        self.train_dataset = Dataset(**params, subject_dict=train_dict, use_augmentations=False, train=True)
-        self.val_dataset = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False) 
-        self.test_dataset = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
-        
-        print("number of train subjects:", len(train_dict))
-        print("number of val subjects:", len(val_dict))
-        print("number of test subjects:", len(test_dict))
-        print("number of train samples:", len(self.train_dataset.data))
-        print("number of val samples:", len(self.val_dataset.data))  
-        print("number of test samples:", len(self.test_dataset.data))
-        
+
+        train_ds = Dataset(**params, subject_dict=train_dict, use_augmentations=False, train=True)
+        val_ds = Dataset(**params, subject_dict=val_dict, use_augmentations=False, train=False)
+        test_ds = Dataset(**params, subject_dict=test_dict, use_augmentations=False, train=False)
+
+        _rank0_print(f"[{dataset_name}] train subjects: {len(train_dict)}, val: {len(val_dict)}, test: {len(test_dict)}")
+        return train_ds, val_ds, test_ds
+
+    def setup(self, stage=None):
+        if getattr(self, "_is_setup", False):
+            return
+        self._is_setup = True
+        data_type = getattr(self.hparams, 'data_type', 'voxel')
+
+        train_parts, val_parts, test_parts = [], [], []
+        for name, path, split_path in zip(self.dataset_names, self.image_paths, self.split_file_paths):
+            t, v, te = self._build_single_dataset(name, path, split_path, data_type)
+            train_parts.append(t)
+            val_parts.append(v)
+            test_parts.append(te)
+
+        if len(train_parts) == 1:
+            self.train_dataset = train_parts[0]
+            self.val_dataset = val_parts[0]
+            self.test_dataset = test_parts[0]
+        else:
+            self.train_dataset = ConcatDataset(train_parts)
+            self.val_dataset = ConcatDataset(val_parts)
+            self.test_dataset = ConcatDataset(test_parts)
+            # Propagate target_values so downstream scaler logic keeps working.
+            # In pretraining the values are dummies (zeros); they are not used
+            # for loss computation.
+            target_values = np.concatenate(
+                [p.target_values for p in train_parts if hasattr(p, 'target_values')],
+                axis=0,
+            ) if any(hasattr(p, 'target_values') for p in train_parts) else np.zeros((len(self.train_dataset), 1))
+            self.train_dataset.target_values = target_values
+
+        if hasattr(self.train_dataset, 'data'):
+            _rank0_print("number of train samples:", len(self.train_dataset.data))
+            _rank0_print("number of val samples:", len(self.val_dataset.data))
+            _rank0_print("number of test samples:", len(self.test_dataset.data))
+        else:
+            _rank0_print("number of train samples:", len(self.train_dataset))
+            _rank0_print("number of val samples:", len(self.val_dataset))
+            _rank0_print("number of test samples:", len(self.test_dataset))
+
         # DistributedSampler is internally called in pl.Trainer
         def get_params(train):
             return {
@@ -600,10 +782,16 @@ class fMRIDataModule(pl.LightningDataModule):
                 "persistent_workers": (train and (self.hparams.strategy == 'ddp')),
                 "shuffle": train
             }
-        
-        self.train_loader = DataLoader(self.train_dataset, **get_params(train=True))
-        self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
-        self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
+
+        # Use GeometricDataLoader for graph datasets
+        if data_type == 'fc_graph':
+            self.train_loader = GeometricDataLoader(self.train_dataset, **get_params(train=True))
+            self.val_loader = GeometricDataLoader(self.val_dataset, **get_params(train=False))
+            self.test_loader = GeometricDataLoader(self.test_dataset, **get_params(train=False))
+        else:
+            self.train_loader = DataLoader(self.train_dataset, **get_params(train=True))
+            self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
+            self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
 
     def train_dataloader(self):
         return self.train_loader
@@ -623,7 +811,8 @@ class fMRIDataModule(pl.LightningDataModule):
         group = parser.add_argument_group("DataModule arguments")
         group.add_argument("--dataset_split_num", type=int, default=1)
         group.add_argument("--label_scaling_method", default="standardization", choices=["minmax","standardization"], help="label normalization strategy for a regression task (mean and std are automatically calculated using train set)")
-        group.add_argument("--image_path", default=None, help="path to image datasets preprocessed for SwiFT")
+        group.add_argument("--image_path", default=None,
+                          help="path to image datasets preprocessed for SwiFT. In --pretraining mode with multiple --dataset_name entries, pass a comma-separated list with one root per dataset.")
         group.add_argument("--bad_subj_path", default=None, help="path to txt file that contains subjects with bad fMRI quality")
         group.add_argument("--train_split", default=0.9, type=float)
         group.add_argument("--val_split", default=0.1, type=float)
@@ -637,5 +826,16 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")
+        group.add_argument("--data_format", type=str, default="auto", choices=["auto", "pt", "h5"], help="data format to load: auto (detect per subject), pt, or h5")
+
+        # New arguments for ROI/FC data
+        group.add_argument("--data_type", type=str, default="voxel", choices=["voxel", "roi", "fc", "fc_graph", "fc_bnt"],
+                          help="type of data: voxel (4D fMRI), roi (2D time series), fc (2D connectivity matrix), fc_graph (graph for BrainGNN), fc_bnt (FC for BrainNetworkTransformer)")
+        group.add_argument("--atlas_name", type=str, default="cc200",
+                          help="brain atlas name (e.g., cc200, aal, schaefer)")
+        group.add_argument("--fc_type", type=str, default="correlation", choices=["correlation", "partial_correlation"],
+                          help="type of functional connectivity")
+        group.add_argument("--fc_threshold", type=float, default=None,
+                          help="threshold for FC edge pruning (None = keep all edges)")
 
         return parser

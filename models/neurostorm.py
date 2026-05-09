@@ -5,6 +5,7 @@ https://github.com/Transconnectome/SwiFT/blob/main/project/module/models/swin4d_
 """
 
 import itertools
+import os
 from typing import Optional, Sequence, Tuple, Type
 
 import numpy as np
@@ -803,9 +804,6 @@ class NeuroSTORM(nn.Module):
         patch_dim =  ((img_size[0]//patch_size[0]), (img_size[1]//patch_size[1]), (img_size[2]//patch_size[2]), (img_size[3]//patch_size[3]))
 
         #print img, patch size, patch dim
-        print("img_size: ", img_size)
-        print("patch_size: ", patch_size)
-        print("patch_dim: ", patch_dim)
         self.pos_embeds = nn.ModuleList()
         pos_embed_dim = embed_dim
         for i in range(self.num_layers):
@@ -943,6 +941,7 @@ class NeuroSTORMMAE(nn.Module):
         mask_ratio: float = 0.1,
         spatial_mask="random",
         time_mask="random",
+        atlas_map_path=None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -968,7 +967,14 @@ class NeuroSTORMMAE(nn.Module):
             spatial_dims=spatial_dims,
         )
         window_volume = window_size[0] * window_size[1] * window_size[2] * window_size[3]
-        self.mask_token = nn.Parameter(torch.zeros([window_volume, embed_dim], dtype=torch.float32))
+        self.mask_token = nn.Parameter(torch.zeros(embed_dim, dtype=torch.float32))
+        self.window_mask_token = nn.Parameter(torch.zeros([window_volume, embed_dim], dtype=torch.float32))
+        self.atlas_mask_token = nn.Parameter(torch.zeros(embed_dim, dtype=torch.float32))
+        if atlas_map_path is not None:
+            atlas_data = torch.load(atlas_map_path, weights_only=True)
+            self.register_buffer('atlas_map', atlas_data['atlas_map'])
+        else:
+            self.atlas_map = None
         grid_size = self.patch_embed.grid_size
         self.grid_size = grid_size
         self.pos_drop = nn.Dropout(p=drop_rate)
@@ -979,9 +985,6 @@ class NeuroSTORMMAE(nn.Module):
         patch_dim = ((img_size[0]//patch_size[0]), (img_size[1]//patch_size[1]), (img_size[2]//patch_size[2]), (img_size[3]//patch_size[3]))
 
         #print img, patch size, patch dim
-        print("img_size: ", img_size)
-        print("patch_size: ", patch_size)
-        print("patch_dim: ", patch_dim)
         self.pos_embeds = nn.ModuleList()
         pos_embed_dim = embed_dim
         for i in range(self.num_layers):
@@ -1100,7 +1103,24 @@ class NeuroSTORMMAE(nn.Module):
         self.decoder_pred = nn.Linear(embed_dim * 2 ** (len(depths) - 1) // 8, patch_size[0] ** 3 * in_chans, bias=True)
 
     def random_masking(self, sequence):
+        """
+        Apply masking to the input sequence.
+
+        Args:
+            sequence: Input tensor of shape (B, C, D, H, W, T)
+                     where D, H, W are spatial dimensions and T is time dimension
+
+        Returns:
+            new_sequence: Masked sequence
+            overall_mask: Binary mask indicating masked positions
+
+        Masking strategies:
+            - spatial_mask: 'random', 'window', or 'atlas'
+            - time_mask: 'random' or 'tube'
+        """
+        input_device = sequence.device
         if self.spatial_mask == 'random' and self.time_mask == 'random':
+            # Fully random masking: flatten all spatial and temporal tokens, then randomly mask
             sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
             B, D, H, W, T, C = sequence.shape
             sequence = rearrange(sequence, 'B D H W T C -> B (D H W T) C')
@@ -1117,16 +1137,51 @@ class NeuroSTORMMAE(nn.Module):
                 np.random.shuffle(mask)
                 overall_mask[i, :] = mask
 
-            overall_mask = torch.from_numpy(overall_mask).to(torch.bool)
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(sequence.device)
             sequence = rearrange(sequence, 'B N C -> (B N) C')
-            overall_mask = rearrange(overall_mask, 'B N -> (B N)')
-            sequence[overall_mask] = self.mask_token
-            overall_mask = rearrange(overall_mask, '(B N) -> B N', B=B)
-            overall_mask = overall_mask.cuda()
-            new_sequence = rearrange(sequence, '(B N) C -> B C D H W T', B=B, C=C, D=D, H=H, W=W, T=T)
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            mask_token = self.mask_token.to(sequence.device, sequence.dtype)
+            sequence = sequence.clone()
+            sequence[overall_mask_flat] = mask_token
+            sequence = rearrange(sequence, '(B N) C -> B N C', B=B)
+            overall_mask = rearrange(overall_mask, 'B N -> B N')
+            sequence = rearrange(sequence, 'B (D H W T) C -> B D H W T C', D=D, H=H, W=W, T=T)
+            new_sequence = rearrange(sequence, 'B D H W T C -> B C D H W T')
+
         elif self.spatial_mask == 'atlas' and self.time_mask == 'random':
-            raise NotImplementedError
+            assert self.atlas_map is not None, "atlas_map must be loaded for atlas masking"
+            sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
+            B, D, H, W, T, C = sequence.shape
+
+            unique_regions = torch.unique(self.atlas_map)
+            unique_regions = unique_regions[unique_regions > 0]
+            num_regions = len(unique_regions)
+            num_mask = max(1, int(num_regions * self.mask_ratio))
+
+            sequence = rearrange(sequence, 'B D H W T C -> B (D H W T) C')
+            N = D * H * W * T
+            overall_mask = np.zeros([B, N])
+
+            for i in range(B):
+                perm = torch.randperm(num_regions)[:num_mask]
+                selected = unique_regions[perm]
+                spatial = torch.zeros(D, H, W, dtype=torch.bool)
+                for r in selected:
+                    spatial |= (self.atlas_map == r)
+                full_mask = spatial.unsqueeze(-1).expand(D, H, W, T).reshape(-1)
+                overall_mask[i] = full_mask.numpy()
+
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(sequence.device)
+            sequence = rearrange(sequence, 'B N C -> (B N) C')
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            atlas_mask_token = self.atlas_mask_token.to(sequence.device, sequence.dtype)
+            sequence = sequence.clone()
+            sequence[overall_mask_flat] = atlas_mask_token
+            overall_mask = rearrange(overall_mask, 'B N -> B N')
+            new_sequence = rearrange(sequence, '(B N) C -> B C D H W T', B=B, C=C, D=D, H=H, W=W, T=T)
+
         elif self.spatial_mask == 'window' and self.time_mask == 'random':
+            # Window-level masking: partition into windows, then randomly mask entire windows
             sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
             B, D, H, W, T, C = sequence.shape
             dims = (B, D, H, W, T)
@@ -1144,15 +1199,18 @@ class NeuroSTORMMAE(nn.Module):
                 np.random.shuffle(mask)
                 overall_mask[i, :] = mask
 
-            overall_mask = torch.from_numpy(overall_mask).to(torch.bool)
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(windows.device)
             windows = rearrange(windows, 'B N W C -> (B N) W C')
-            overall_mask = rearrange(overall_mask, 'B N -> (B N)')
-            windows[overall_mask] = self.mask_token
-            overall_mask = rearrange(overall_mask, '(B N) -> B N', B=B)
-            overall_mask = overall_mask.cuda()
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            window_mask_token = self.window_mask_token.to(windows.device, windows.dtype)
+            windows = windows.clone()
+            windows[overall_mask_flat] = window_mask_token
+            overall_mask = rearrange(overall_mask, 'B N -> B N')
             new_sequence = window_reverse(windows, self.window_size, dims)
             new_sequence = rearrange(new_sequence, 'B D H W T C -> B C D H W T')
+
         elif self.spatial_mask == 'random' and self.time_mask == 'tube':
+            # Tube masking: mask along temporal dimension (spatial location fixed, all time steps masked)
             sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
             B, D, H, W, T, C = sequence.shape
             dims = (B, D, H, W, T)
@@ -1173,18 +1231,55 @@ class NeuroSTORMMAE(nn.Module):
             overall_mask = torch.from_numpy(overall_mask).to(torch.bool)
             windows = rearrange(windows, 'B N W C -> (B N) W C')
             overall_mask = rearrange(overall_mask, 'B N -> (B N)')
-            windows[overall_mask] = self.mask_token
+            windows[overall_mask] = self.window_mask_token
             overall_mask = rearrange(overall_mask, '(B N) -> B N', B=B)
             overall_mask = overall_mask.cuda()
             new_sequence = window_reverse(windows, self.tube_window_size, dims)
             new_sequence = rearrange(new_sequence, 'B D H W T C -> B C D H W T')
+
         elif self.spatial_mask == 'atlas' and self.time_mask == 'tube':
-            raise NotImplementedError
+            assert self.atlas_map is not None, "atlas_map must be loaded for atlas masking"
+            sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
+            B, D, H, W, T, C = sequence.shape
+
+            unique_regions = torch.unique(self.atlas_map)
+            unique_regions = unique_regions[unique_regions > 0]
+            num_regions = len(unique_regions)
+            num_mask = max(1, int(num_regions * self.mask_ratio))
+
+            sequence = rearrange(sequence, 'B D H W T C -> B (D H W T) C')
+            N = D * H * W * T
+            overall_mask = np.zeros([B, N])
+
+            for i in range(B):
+                perm = torch.randperm(num_regions)[:num_mask]
+                selected = unique_regions[perm]
+                spatial = torch.zeros(D, H, W, dtype=torch.bool)
+                for r in selected:
+                    spatial |= (self.atlas_map == r)
+                full_mask = spatial.unsqueeze(-1).expand(D, H, W, T).reshape(-1)
+                overall_mask[i] = full_mask.numpy()
+
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(sequence.device)
+            sequence = rearrange(sequence, 'B N C -> (B N) C')
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            atlas_mask_token = self.atlas_mask_token.to(sequence.device, sequence.dtype)
+            sequence = sequence.clone()
+            sequence[overall_mask_flat] = atlas_mask_token
+            overall_mask = rearrange(overall_mask, 'B N -> B N')
+            new_sequence = rearrange(sequence, '(B N) C -> B C D H W T', B=B, C=C, D=D, H=H, W=W, T=T)
+
         elif self.spatial_mask == 'window' and self.time_mask == 'tube':
-            raise NotImplementedError
+            # Window-level spatial masking + tube temporal masking
+            # TODO: Implement window-tube combined masking
+            raise NotImplementedError("Window-tube combined masking is not yet implemented")
+
         else:
-            print("Invalid mask type")
-            import ipdb; ipdb.set_trace()
+            raise ValueError(f"Invalid mask type: spatial_mask={self.spatial_mask}, time_mask={self.time_mask}")
+
+        # Ensure output is on the same device as input
+        new_sequence = new_sequence.to(input_device)
+        overall_mask = overall_mask.to(input_device)
 
         return new_sequence, overall_mask
 
@@ -1233,20 +1328,47 @@ class NeuroSTORMMAE(nn.Module):
         return x
     
     def forward_loss(self, x, pred, mask):
+        """
+        Compute reconstruction loss for masked autoencoder.
+
+        Args:
+            x: Original input
+            pred: Reconstructed output
+            mask: Binary mask indicating masked positions
+
+        Returns:
+            loss: Mean squared error loss on masked positions
+        """
         if self.spatial_mask == 'random' and self.time_mask == 'random':
-            import ipdb; ipdb.set_trace()
+            # For fully random masking, compute loss on flattened patches
             x_patch = self.patchify(x)
             pred_patch = self.patchify(pred)
-            loss = (x_windows - pred_windows) ** 2
-            loss = loss.mean(dim=-1)
-            loss = loss.mean(dim=-1)
+            loss = (x_patch - pred_patch) ** 2
+            loss = loss.mean(dim=-1)  # (B, pH, pW, pD, T)
+            loss = rearrange(loss, 'B D H W T -> B (D H W T)')  # (B, N)
             loss = (loss * mask).sum() / mask.sum()
+        elif self.spatial_mask == 'atlas':
+            x_patch = self.patchify(x)
+            pred_patch = self.patchify(pred)
+            loss = (x_patch - pred_patch) ** 2
+            loss = loss.mean(dim=-1)
+            loss = rearrange(loss, 'B D H W T -> B (D H W T)')
+            loss = (loss * mask.float()).sum() / mask.float().sum()
         elif self.spatial_mask == 'window' and self.time_mask == 'random':
+            # For window masking, compute loss on window-partitioned patches
             x_patch = self.patchify(x)
             pred_patch = self.patchify(pred)
             x_windows = window_partition_with_b(x_patch, self.window_size)
             pred_windows = window_partition_with_b(pred_patch, self.window_size)
             loss = (x_windows - pred_windows) ** 2
+            loss = loss.mean(dim=-1)
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        else:
+            # Default loss computation for other masking strategies
+            x_patch = self.patchify(x)
+            pred_patch = self.patchify(pred)
+            loss = (x_patch - pred_patch) ** 2
             loss = loss.mean(dim=-1)
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()

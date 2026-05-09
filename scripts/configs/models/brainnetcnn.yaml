@@ -1,0 +1,17 @@
+model: brainnetcnn
+data_type: fc_bnt
+fc_type: correlation
+atlas_name: cc200
+optimizer: AdamW
+learning_rate: 0.001
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  brainnetcnn_variant: standard
+  e2e_channels: [32, 64, 64]
+  e2n_channels: 128
+  n2g_channels: 256
+  fc_channels: [128, 64]
+  dropout: 0.5

@@ -1,21 +1,41 @@
+# ============================================================
+# OS
+# ============================================================
 .DS_Store
-models/__pycache__
-models/heads/__pycache__
-datasets/__pycache__
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+
+# ============================================================
+# IDE / editor
+# ============================================================
+.vscode/settings.json
+
+# ============================================================
+# Local wheels and installers
+# ============================================================
 mamba_ssm-2.2.2+cu118torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 causal_conv1d-1.5.0.post8+cu11torch2.1cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
-utils/__pycache__
+fslinstaller.py
+
+# ============================================================
+# Data and model outputs
+# ============================================================
 data
 output
-attn.pkl
-movie.zip
-fslinstaller.py
-dlc_run.sh
 datasets/ukb_roi
-datasets/HCP1200_roi.zip
 datasets/HCP1200_roi
+datasets/HCP1200_roi.zip
 datasets/hcp_task_roi
-scripts/dataset_download/hcp_t1t2
+movie.zip
+
+# ============================================================
+# Local scratch files (not tracked)
+# ============================================================
+attn.pkl
+dlc_run.sh
 datasets/save_frames.py
 datasets/hcp_task_2448996.csv
-.vscode/settings.json
+scripts/dataset_download/hcp_t1t2

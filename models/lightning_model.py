@@ -36,15 +36,17 @@ class LightningModel(pl.LightningModule):
         self.save_hyperparameters(kwargs) # save hyperparameters except data_module (data_module cannot be pickled as a checkpoint)
        
         # you should define target_values at the Dataset classes
-        target_values = data_module.train_dataset.target_values
-        if self.hparams.label_scaling_method == 'standardization':
-            scaler = StandardScaler()
-            normalized_target_values = scaler.fit_transform(target_values)
-        elif self.hparams.label_scaling_method == 'minmax': 
-            scaler = MinMaxScaler()
-            normalized_target_values = scaler.fit_transform(target_values)
-        self.scaler = scaler
-        print('model name = {}'.format(self.hparams.model))
+        if data_module is not None:
+            target_values = data_module.train_dataset.target_values
+            if self.hparams.label_scaling_method == 'standardization':
+                scaler = StandardScaler()
+                normalized_target_values = scaler.fit_transform(target_values)
+            elif self.hparams.label_scaling_method == 'minmax':
+                scaler = MinMaxScaler()
+                normalized_target_values = scaler.fit_transform(target_values)
+            self.scaler = scaler
+        else:
+            self.scaler = None
         self.model = load_model(self.hparams.model, self.hparams)
         self.start_time_data = time.time()
 
@@ -374,7 +376,7 @@ class LightningModel(pl.LightningModule):
         ap_sum = 0.0
 
         for i in range(N):
-            sims = sim_matrix[i]
+            sims = sim_matrix[i].clone()
             sims[i] = -float('inf')
 
             if gallery_size is not None and gallery_size > 0:
@@ -430,16 +432,18 @@ class LightningModel(pl.LightningModule):
             outputs_test = outputs[1]
             subj_valid = []
             subj_test = []
-            out_valid_logits_list, out_valid_target_list = [], []
-            out_test_logits_list, out_test_target_list = [], []
+            out_valid_logits_list, out_valid_target_list, out_valid_feat_list = [], [], []
+            out_test_logits_list, out_test_target_list, out_test_feat_list = [], [], []
             for subj, out in outputs_valid:
                 subj_valid += subj
                 out_valid_logits_list.append(out[0])
                 out_valid_target_list.append(out[1])
+                out_valid_feat_list.append(out[2])
             for subj, out in outputs_test:
                 subj_test += subj
                 out_test_logits_list.append(out[0])
                 out_test_target_list.append(out[1])
+                out_test_feat_list.append(out[2])
             subj_valid = np.array(subj_valid)
             subj_test = np.array(subj_test)
             total_out_valid_logits = torch.cat(out_valid_logits_list, dim=0)
@@ -447,9 +451,18 @@ class LightningModel(pl.LightningModule):
             total_out_test_logits = torch.cat(out_test_logits_list, dim=0)
             total_out_test_target = torch.cat(out_test_target_list, dim=0)
 
-            # evaluate 
-            self._evaluate_metrics(subj_valid, total_out_valid_logits, total_out_valid_target, mode="valid")
-            self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
+            if self.hparams.task_name == 'fmri_reid':
+                valid_feat_list = [f for f in out_valid_feat_list if f is not None]
+                test_feat_list = [f for f in out_test_feat_list if f is not None]
+                if len(valid_feat_list) > 0:
+                    total_out_valid_feat = torch.cat(valid_feat_list, dim=0)
+                    self._evaluate_reid(subj_valid, total_out_valid_feat, total_out_valid_target, mode="valid")
+                if len(test_feat_list) > 0:
+                    total_out_test_feat = torch.cat(test_feat_list, dim=0)
+                    self._evaluate_reid(subj_test, total_out_test_feat, total_out_test_target, mode="test")
+            else:
+                self._evaluate_metrics(subj_valid, total_out_valid_logits, total_out_valid_target, mode="valid")
+                self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
             
     # If you use loggers other than Neptune you may need to modify this
     def _save_predictions(self,total_subjs,total_out, mode):
@@ -631,6 +644,7 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--spatial_mask", type=str, default="random", help="spatial mae strategy")
         group.add_argument("--time_mask", type=str, default="random", help="time mae strategy")
         group.add_argument("--mask_ratio", type=float, default=0.1, help="mae masking ratio")
+        group.add_argument("--atlas_map_path", type=str, default=None, help="path to precomputed atlas patch map (.pt) for atlas-based masking")
         group.add_argument("--pretraining", action='store_true', help="whether to use pretraining")
         group.add_argument("--augment_during_training", action='store_true', help="whether to augment input images during training")
         group.add_argument("--augment_only_affine", action='store_true', help="whether to only apply affine augmentation")
@@ -652,6 +666,32 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--clf_head_version", type=str, default="v1", help="clf head version, v2 has a hidden layer")
         group.add_argument("--attn_drop_rate", type=float, default=0, help="dropout rate of attention layers")
         group.add_argument("--reid_gallery_size", type=int, default=None, help="Limit gallery size when evaluating re-identification (use all if unset)")
+
+        # graph/FC model related
+        group.add_argument("--num_rois", type=int, default=200, help="number of ROIs for graph/FC models")
+        group.add_argument("--pooling_ratio", type=float, default=0.5, help="pooling ratio for BrainGNN")
+        group.add_argument("--num_communities", type=int, default=8, help="number of communities for BrainGNN/Com-BrainTF")
+        group.add_argument("--hidden_dims", nargs="+", default=[128, 64], type=int, help="hidden dimensions for GNN layers")
+        group.add_argument("--pooling_sizes", nargs="+", default=[100, 50, 25], type=int, help="pooled node sizes for BNT")
+        group.add_argument("--do_pooling", nargs="+", default=[True, True, False], type=str2bool, help="whether to pool at each BNT layer")
+        group.add_argument("--hidden_size", type=int, default=1024, help="feedforward hidden size for BNT")
+        group.add_argument("--d_model", type=int, default=128, help="transformer hidden dim for Com-BrainTF")
+        group.add_argument("--nhead", type=int, default=4, help="number of attention heads for Com-BrainTF")
+        group.add_argument("--num_layers", type=int, default=3, help="number of transformer layers for Com-BrainTF")
+        group.add_argument("--dim_feedforward", type=int, default=512, help="feedforward dim for Com-BrainTF")
+        group.add_argument("--pos_encoding", type=str, default="identity", choices=["identity", "none"], help="position encoding type for BNT")
+        group.add_argument("--pos_embed_dim", type=int, default=32, help="position embedding dimension for BNT")
+        group.add_argument("--k_neighbors", type=int, default=10, help="number of neighbors for LG-GNN graph learning")
+        group.add_argument("--learn_graph", type=str2bool, default=True, help="whether to learn graph structure in LG-GNN")
+        group.add_argument("--graph_metric", type=str, default="cosine", choices=["cosine", "euclidean", "attention"], help="similarity metric for LG-GNN")
+        group.add_argument("--use_edge_attr", type=str2bool, default=True, help="whether to use edge attributes in IBGNN")
+        group.add_argument("--use_community_mask", type=str2bool, default=True, help="whether to use community mask in Com-BrainTF")
+        group.add_argument("--dropout", type=float, default=0.5, help="dropout rate for graph/FC models")
+        group.add_argument("--brainnetcnn_variant", type=str, default="standard", choices=["standard", "deep"], help="BrainNetCNN variant")
+        group.add_argument("--e2e_channels", nargs="+", default=[32, 64, 64], type=int, help="E2E conv channels for BrainNetCNN")
+        group.add_argument("--e2n_channels", type=int, default=128, help="E2N conv channels for BrainNetCNN")
+        group.add_argument("--n2g_channels", type=int, default=256, help="N2G conv channels for BrainNetCNN")
+        group.add_argument("--fc_channels", nargs="+", default=[128, 64], type=int, help="FC layer channels for BrainNetCNN")
 
         # others
         group.add_argument("--scalability_check", action='store_true', help="whether to check scalability")

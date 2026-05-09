@@ -7,6 +7,7 @@ from multiprocessing import Process, Queue
 import argparse
 import torch.nn.functional as F
 import numpy as np
+import h5py
 
 
 def select_middle_96(vector):
@@ -69,7 +70,7 @@ def temporal_resampling(data, header, target_time_resolution=0.8):
     return resampled_data
 
 
-def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue=None, scaling_method=None, fill_zeroback=False):
+def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue=None, scaling_method=None, fill_zeroback=False, output_format='pt'):
     print("processing: " + filename, flush=True)
     path = os.path.join(load_root, filename)
     try:
@@ -134,8 +135,14 @@ def read_data(dataset_name, delete_after_preprocess, filename, load_root, save_r
     data_global = data_global.type(torch.float16)
     data_global_split = torch.split(data_global, 1, 3)
 
-    for i, TR in enumerate(data_global_split):
-        torch.save(TR.clone(), os.path.join(save_dir, "frame_"+str(i)+".pt"))
+    if output_format == 'h5':
+        h5_path = os.path.join(save_dir, "frames.h5")
+        with h5py.File(h5_path, 'w') as h5f:
+            for i, TR in enumerate(data_global_split):
+                h5f.create_dataset(f"frame_{i}", data=TR.clone().numpy(), dtype='float16', compression='lzf')
+    else:
+        for i, TR in enumerate(data_global_split):
+            torch.save(TR.clone(), os.path.join(save_dir, "frame_"+str(i)+".pt"))
     
     if delete_after_preprocess:
         os.remove(path)
@@ -149,6 +156,7 @@ def main():
     parser.add_argument('--delete_after_preprocess', action='store_true', help='delete nii file after preprocess')
     parser.add_argument('--delete_nii', action='store_true', help='if you did not delete after preprocess, you can use it to delete nii file')
     parser.add_argument('--num_processes', type=int, default=1, help='number of processes to use')
+    parser.add_argument('--output_format', type=str, default='pt', choices=['pt', 'h5'], help='output format: pt (one .pt per frame) or h5 (single .h5 per subject)')
     args = parser.parse_args()
     
     dataset_name = args.dataset_name
@@ -176,10 +184,10 @@ def main():
             try:
                 count += 1
                 if args.num_processes == 1:
-                    read_data(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method)
+                    read_data(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method, output_format=args.output_format)
                 else:
                     processes = []
-                    p = Process(target=read_data, args=(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method))
+                    p = Process(target=read_data, args=(dataset_name, args.delete_after_preprocess, filename, load_root, save_root, subj_name, count, queue, scaling_method, False, args.output_format))
                     processes.append(p)
                     p.start()
                     if count % args.num_processes == 0:

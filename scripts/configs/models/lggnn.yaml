@@ -1,0 +1,16 @@
+model: lggnn
+data_type: fc_bnt
+fc_type: correlation
+atlas_name: cc200
+optimizer: AdamW
+learning_rate: 0.001
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  hidden_dims: [128, 64]
+  k_neighbors: 10
+  learn_graph: true
+  graph_metric: cosine
+  dropout: 0.5

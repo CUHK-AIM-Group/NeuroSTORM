@@ -1,5 +1,42 @@
 import os
+import warnings
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+
+# Silence noisy third-party warnings before any heavy imports so that the
+# `FutureWarning`s raised when mamba_ssm loads its @custom_fwd/@custom_bwd
+# decorators are suppressed at import time.
+warnings.filterwarnings(
+    "ignore",
+    message=r".*torch\.cuda\.amp\.custom_(fwd|bwd).*",
+    category=FutureWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*pkg_resources is deprecated.*",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*Checkpoint directory .* exists and is not empty.*",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*No device id is provided via `init_process_group`.*",
+    category=UserWarning,
+)
+# Tensor Cores hint from Lightning; address it explicitly below.
+warnings.filterwarnings(
+    "ignore",
+    message=r".*You are using a CUDA device .* that has Tensor Cores.*",
+)
+os.environ.setdefault("PYTHONWARNINGS", "ignore::FutureWarning,ignore::UserWarning")
+
+# Tag DDP-spawned workers so setup-time prints only happen in the parent
+# process. Lightning's ddp strategy sets LOCAL_RANK in the child env before
+# re-exec'ing main.py, so its presence is a reliable worker signal.
+if "LOCAL_RANK" in os.environ:
+    os.environ["NEUROSTORM_IS_WORKER"] = "1"
 
 import torch
 from collections import OrderedDict
@@ -7,6 +44,21 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
+
+# Silence Lightning's INFO-level chatter: "GPU available ... / TPU available
+# ... / Initializing distributed / LOCAL_RANK: X - CUDA_VISIBLE_DEVICES ..."
+# and the per-rank "Global seed set to X" messages.
+import logging as _logging
+_logging.getLogger("pytorch_lightning").setLevel(_logging.WARNING)
+_logging.getLogger("pytorch_lightning.utilities.distributed").setLevel(_logging.WARNING)
+_logging.getLogger("pytorch_lightning.accelerators.cuda").setLevel(_logging.WARNING)
+_logging.getLogger("lightning_fabric").setLevel(_logging.WARNING)
+_logging.getLogger("lightning_fabric.utilities.seed").setLevel(_logging.WARNING)
+
+# Honour Lightning's Tensor Core hint once so we don't pay the precision
+# warning on every rank.
+if torch.cuda.is_available():
+    torch.set_float32_matmul_precision("high")
 
 import neptune
 from utils.data_module import fMRIDataModule
@@ -20,19 +72,23 @@ def cli_main():
     # ------------ args -------------
     parser = ArgumentParser(add_help=False, formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("--seed", default=1234, type=int, help="random seeds. recommend aligning this argument with data split number to control randomness")
-    parser.add_argument("--dataset_name", type=str, choices=["HCP1200", "ABCD", "UKB", "Cobre", "ADHD200", "HCPA", "HCPD", "UCLA", "HCPEP", "HCPTASK", "GOD", "NSD", "BOLD5000", "MOVIE", "TransDiag"], default="HCP1200")
+    parser.add_argument("--dataset_name", type=str, default="HCP1200",
+                        help="Dataset name. Supported: HCP1200, HCPA, HCPD, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, NSD, BOLD5000, MOVIE, TransDiag. "
+                             "In --pretraining mode a comma-separated list (e.g. 'HCP1200,HCPA,HCPD,ABCD,UKB') is accepted; --image_path must then list the same number of entries.")
     parser.add_argument("--downstream_task_id", type=int, default="1", help="downstream task id")
     parser.add_argument("--downstream_task_type", type=str, default="classification", help="select either classification or regression according to your downstream task")
     parser.add_argument("--task_name", type=str, default="sex", help="specify the task name")
-    parser.add_argument("--loggername", default="default", type=str, help="A name of logger")
+    parser.add_argument("--loggername", default="tensorboard", type=str, help="A name of logger")
     parser.add_argument("--project_name", default="default", type=str, help="A name of project")
     parser.add_argument("--auto_resume", action='store_true', help="Whether to find the last checkpoint and resume the training")
     parser.add_argument("--resume_ckpt_path", type=str, help="A path to previous checkpoint. Use when you want to continue the training from the previous checkpoints")
     parser.add_argument("--load_model_path", type=str, help="A path to the pre-trained model weight file (.pth)")
-    parser.add_argument("--test_only", action='store_true', help="specify when you want to test the checkpoints (model weights)")
+    parser.add_argument("--test_only", action='store_true', help="Whether to test the checkpoints (model weights)")
     parser.add_argument("--test_ckpt_path", type=str, help="A path to the previous checkpoint that intends to evaluate (--test_only should be True)")
     parser.add_argument("--freeze_feature_extractor", action='store_true', help="Whether to freeze the feature extractor (for evaluating the pre-trained weight)")
     parser.add_argument("--print_flops", action='store_true', help="Whether to print the number of FLOPs")
+    parser.add_argument("--gpu_ids", type=str, default=None, help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, uses all available GPUs")
+    parser.add_argument("--num_gpus", type=int, default=None, help="Number of GPUs to use. If not specified, uses all available GPUs or those specified by --gpu_ids")
 
     # Set dataset
     Dataset = fMRIDataModule
@@ -44,11 +100,23 @@ def cli_main():
     _, _ = parser.parse_known_args()  # This command blocks the help message of Trainer class.
     parser = pl.Trainer.add_argparse_args(parser)
     args = parser.parse_args()
-    
+
+    # Handle GPU selection
+    # Priority: --gpu_ids > --num_gpus > CUDA_VISIBLE_DEVICES > all GPUs
+    if args.gpu_ids is not None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_ids
+        num_gpus = len(args.gpu_ids.split(','))
+    elif args.num_gpus is not None:
+        num_gpus = min(args.num_gpus, torch.cuda.device_count())
+    elif 'CUDA_VISIBLE_DEVICES' in os.environ:
+        num_gpus = len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
+    else:
+        num_gpus = torch.cuda.device_count()
+
     #override parameters
     max_epochs = args.max_epochs
     num_nodes = args.num_nodes
-    devices = torch.cuda.device_count()
+    devices = num_gpus if num_gpus > 0 else None
     project_name = args.project_name
     image_path = args.image_path
 
@@ -56,13 +124,19 @@ def cli_main():
         category_dir = "neurostorm"
     elif args.model in ["swift", "tff"]:
         category_dir = "volume-based"
-    elif args.model in ["braingnn", "bnt"]:
-        category_dir = "roi-based"
+    elif args.model in ["braingnn", "lggnn", "ibgnn"]:
+        category_dir = "graph-based"
+    elif args.model in ["bnt", "combraintf", "brainnetcnn"]:
+        category_dir = "fc-based"
+    else:
+        category_dir = "other"
     setattr(args, "default_root_dir", os.path.join('output', category_dir, args.project_name))
 
     resume_ckpt_path = None if args.resume_ckpt_path is None else args.resume_ckpt_path
     if args.resume_ckpt_path is None and args.auto_resume:
-        resume_ckpt_path = os.path.join('output', category_dir, args.project_name, 'last.ckpt')
+        ckpt_candidate = os.path.join('output', category_dir, args.project_name, 'last.ckpt')
+        if os.path.exists(ckpt_candidate):
+            resume_ckpt_path = ckpt_candidate
     setattr(args, "resume_ckpt_path", resume_ckpt_path)
 
     if args.resume_ckpt_path is not None:
@@ -75,13 +149,17 @@ def cli_main():
         args.max_epochs = max_epochs
         args.num_nodes = num_nodes
         args.devices = torch.cuda.device_count()
-        args.image_path = image_path       
+        args.image_path = image_path
     else:
         exp_id = None
 
     # ------------ data -------------
     data_module = Dataset(**vars(args))
     pl.seed_everything(args.seed)
+
+    if args.task_name == 'fmri_reid':
+        args.num_classes = data_module.hparams.num_classes
+        print(f'ReID task: num_classes set to {args.num_classes}')
 
     # ------------ logger -------------
     if args.loggername == "tensorboard":
@@ -111,13 +189,22 @@ def cli_main():
         )
     # callback for classification task
     elif args.downstream_task_type == "classification":
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=dirpath,
-            monitor="valid_acc",
-            filename="checkpt-{epoch:02d}-{valid_acc:.2f}",
-            save_last=True,
-            mode="max",
-        )
+        if args.task_name == 'fmri_reid':
+            checkpoint_callback = ModelCheckpoint(
+                dirpath=dirpath,
+                monitor="valid_reid_top1",
+                filename="checkpt-{epoch:02d}-{valid_reid_top1:.4f}",
+                save_last=True,
+                mode="max",
+            )
+        else:
+            checkpoint_callback = ModelCheckpoint(
+                dirpath=dirpath,
+                monitor="valid_acc",
+                filename="checkpt-{epoch:02d}-{valid_acc:.2f}",
+                save_last=True,
+                mode="max",
+            )
     # callback for regression task
     else:
         checkpoint_callback = ModelCheckpoint(
@@ -132,8 +219,17 @@ def cli_main():
     callbacks = [checkpoint_callback, lr_monitor]
 
     # ------------ trainer -------------
+    # Determine accelerator and devices
+    if torch.cuda.is_available() and num_gpus > 0:
+        accelerator = 'gpu'
+        trainer_devices = num_gpus
+        strategy = 'ddp' if num_gpus > 1 else None
+    else:
+        accelerator = 'cpu'
+        trainer_devices = None
+        strategy = None
+
     if args.grad_clip:
-        print('using gradient clipping')
         trainer = pl.Trainer.from_argparse_args(
             args,
             logger=logger,
@@ -141,15 +237,19 @@ def cli_main():
             gradient_clip_val=0.5,
             gradient_clip_algorithm="norm",
             track_grad_norm=-1,
+            accelerator=accelerator,
+            devices=trainer_devices,
+            strategy=strategy,
         )
     else:
-        print('not using gradient clipping')
-        print(args)
         trainer = pl.Trainer.from_argparse_args(
             args,
             logger=logger,
             check_val_every_n_epoch=1,
-            callbacks=callbacks
+            callbacks=callbacks,
+            accelerator=accelerator,
+            devices=trainer_devices,
+            strategy=strategy,
         )
 
     # ------------ model -------------
@@ -162,7 +262,7 @@ def cli_main():
             path = args.load_model_path
         else:
             print('cannot find the ckpt file. try to download model from huggingface')
-            repo_id = "zxcvb20001/fMRI-GPT"
+            repo_id = "zxcvb20001/NeuroSTORM"
             if args.model == 'neurostorm':
                 filename = "neurostorm/{}".format(os.path.basename(args.load_model_path))
             elif args.model in ['swift']:

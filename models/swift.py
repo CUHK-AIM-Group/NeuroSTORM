@@ -4,6 +4,7 @@ https://docs.monai.io/en/stable/_modules/monai/networks/nets/swin_unetr.html#Swi
 """
 
 import itertools
+import os
 from typing import Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
@@ -796,9 +797,6 @@ class SwiFT(nn.Module):
 
         patch_dim =  ((img_size[0]//patch_size[0]), (img_size[1]//patch_size[1]), (img_size[2]//patch_size[2]), (img_size[3]//patch_size[3]))
 
-        print("img_size: ", img_size)
-        print("patch_size: ", patch_size)
-        print("patch_dim: ", patch_dim)
         self.pos_embeds = nn.ModuleList()
         pos_embed_dim = embed_dim
         for i in range(self.num_layers):

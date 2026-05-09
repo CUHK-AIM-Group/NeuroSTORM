@@ -7,6 +7,7 @@ from typing import Tuple
 import h5py
 import nibabel as nib
 import numpy as np
+import torch
 from tqdm import tqdm
 
 MASK_DATASETS = {'hcpya', 'hcpa', 'hcpd', 'ukb', 'hcptask'}
@@ -56,7 +57,17 @@ def save_h5(data: np.ndarray, file_path: str):
     return h5_path
 
 
-def process_file(dataset_name: str, file_path: str) -> Tuple[float, float, float, float]:
+def save_pt(data: np.ndarray, file_path: str, save_dir: str):
+    data = torch.from_numpy(data.astype(np.float32))
+    if data.ndim == 4:
+        frames = torch.split(data, 1, dim=3)
+        for i, frame in enumerate(frames):
+            torch.save(frame.half(), os.path.join(save_dir, f"frame_{i}.pt"))
+    else:
+        torch.save(data.half(), os.path.join(save_dir, "data.pt"))
+
+
+def process_file(dataset_name: str, file_path: str, output_format: str = 'h5', save_dir: str = None) -> Tuple[float, float, float, float]:
     t_read0 = time.time()
     img = nib.load(file_path)
     data = img.get_fdata()
@@ -69,7 +80,12 @@ def process_file(dataset_name: str, file_path: str) -> Tuple[float, float, float
     t_proc = time.time() - t_proc0
 
     t_save0 = time.time()
-    save_h5(data, file_path)
+    if output_format == 'pt':
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+        save_pt(data, file_path, save_dir or os.path.dirname(file_path))
+    else:
+        save_h5(data, file_path)
     t_save = time.time() - t_save0
 
     os.remove(file_path)
@@ -90,6 +106,7 @@ def main():
                     "compute foreground mean/std, store stats in a pickle file.")
     parser.add_argument('--dataset_name', required=True, help='Dataset name')
     parser.add_argument('--load_root', required=True, help='Directory containing .nii or .nii.gz files')
+    parser.add_argument('--output_format', type=str, default='h5', choices=['h5', 'pt'], help='Output format: h5 (single HDF5) or pt (per-frame .pt files)')
     args = parser.parse_args()
 
     ds = args.dataset_name.lower()
@@ -101,7 +118,7 @@ def main():
     with tqdm(total=len(files), desc='Processing') as pbar:
         for idx, fname in enumerate(files, 1):
             fpath = os.path.join(args.load_root, fname)
-            mean, std, t_read, t_proc, t_save = process_file(ds, fpath)
+            mean, std, t_read, t_proc, t_save = process_file(ds, fpath, output_format=args.output_format)
 
             total_read += t_read
             total_proc += t_proc

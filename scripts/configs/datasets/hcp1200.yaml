@@ -1,0 +1,19 @@
+dataset_name: HCP1200
+image_path: ./data/HCP1200_MNI_to_TRs_minmax
+image_path_fc: ./data/HCP1200
+
+tasks:
+  task1:
+    downstream_task_id: 1
+    task_name: sex
+    downstream_task_type: classification
+    num_classes: 2
+  task2:
+    downstream_task_id: 2
+    task_name: MMSE_Score
+    downstream_task_type: regression
+    num_classes: 1
+
+defaults:
+  dataset_split_num: 1
+  limit_training_samples: 1.0

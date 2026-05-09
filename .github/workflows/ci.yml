@@ -1,0 +1,119 @@
+name: NeuroSTORM CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install pytorch-lightning==1.9.4
+        pip install numpy scipy pandas scikit-learn
+        pip install nibabel nilearn monai
+        pip install h5py
+        pip install einops
+
+    - name: Install PyTorch Geometric (CPU)
+      run: |
+        pip install torch-geometric
+        pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-$(python -c "import torch; print(torch.__version__.split('+')[0])")+cpu.html
+      continue-on-error: true
+
+    - name: Run tests
+      run: |
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=term -m "not gpu"
+
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8
+
+    - name: Run flake8 (syntax errors only)
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  model-import:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+        pip install pytorch-lightning==1.9.4
+        pip install numpy scipy einops
+        pip install torch-geometric || true
+        pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-$(python -c "import torch; print(torch.__version__.split('+')[0])")+cpu.html || true
+
+    - name: Test FC-based model imports (no PyG dependency)
+      run: |
+        python -c "from models.bnt import BrainNetworkTransformer; print('BNT OK')"
+        python -c "from models.combraintf import ComBrainTF; print('Com-BrainTF OK')"
+        python -c "from models.brainnetcnn import BrainNetCNN; print('BrainNetCNN OK')"
+
+    - name: Test Graph-based model imports (requires PyG)
+      run: |
+        python -c "from models.braingnn import BrainGNN; print('BrainGNN OK')"
+        python -c "from models.lggnn import LGGNN; print('LG-GNN OK')"
+        python -c "from models.ibgnn import IBGNN; print('IBGNN OK')"
+      continue-on-error: true

@@ -1,0 +1,8 @@
+dataset_name: HCPD
+image_path: ./data/HCPD_MNI_to_TRs_minmax
+
+pretrain_only: true
+
+defaults:
+  dataset_split_num: 1
+  batch_size_override: 8

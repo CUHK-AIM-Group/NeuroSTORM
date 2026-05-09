@@ -1,0 +1,17 @@
+model: bnt
+data_type: fc_bnt
+fc_type: correlation
+atlas_name: cc200
+optimizer: AdamW
+learning_rate: 0.001
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  pooling_sizes: [100, 50, 25]
+  do_pooling: [true, true, false]
+  hidden_size: 1024
+  pos_encoding: identity
+  pos_embed_dim: 32
+  dropout: 0.1

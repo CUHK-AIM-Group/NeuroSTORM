@@ -31,15 +31,24 @@ RUN pip install tensorboard tensorboardX tqdm ipdb nvitop monai
 # 7. Install scientific and ML packages
 RUN pip install pytorch-lightning==1.9.4 neptune nibabel nilearn numpy
 
-# 8. Clone and install causal-conv1d
+# 8. Install PyTorch Geometric and dependencies (for graph-based models)
+RUN pip install torch-geometric && \
+    pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
+
+# 9. Install additional dependencies for FC computation and data processing
+RUN pip install scikit-learn pandas h5py deepdish
+
+# 10. Clone and install causal-conv1d
 RUN git clone https://github.com/Dao-AILab/causal-conv1d.git /opt/causal-conv1d \
- && TORCH_CUDA_ARCH_LIST="12.0" pip install --no-cache-dir --no-build-isolation -e /opt/causal-conv1d
+ && cd /opt/causal-conv1d && git checkout v1.5.0.post8 \
+ && TORCH_CUDA_ARCH_LIST="12.0" pip install --no-cache-dir --no-build-isolation -e .
 
-# 9. Clone and install mamba (State-Spaces)
+# 11. Clone and install mamba (State-Spaces)
 RUN git clone https://github.com/state-spaces/mamba.git /opt/mamba \
- && TORCH_CUDA_ARCH_LIST="12.0" pip install --no-cache-dir --no-build-isolation -e /opt/mamba
+ && cd /opt/mamba && git checkout v2.2.2 \
+ && TORCH_CUDA_ARCH_LIST="12.0" pip install --no-cache-dir --no-build-isolation -e .
 
-# 10. (Optional) Create a non-root user for better security
+# 12. (Optional) Create a non-root user for better security
 ARG USERNAME=app
 ARG UID=1001
 RUN useradd -m -u ${UID} ${USERNAME}

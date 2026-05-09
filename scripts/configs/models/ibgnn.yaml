@@ -1,0 +1,14 @@
+model: ibgnn
+data_type: fc_graph
+fc_type: partial_correlation
+atlas_name: cc200
+optimizer: AdamW
+learning_rate: 0.001
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  hidden_dims: [128, 64]
+  use_edge_attr: true
+  dropout: 0.5

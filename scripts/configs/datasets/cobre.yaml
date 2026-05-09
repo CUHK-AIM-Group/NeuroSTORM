@@ -1,0 +1,15 @@
+dataset_name: Cobre
+image_path: ./data/COBRE_MNI_to_TRs_minmax
+image_path_fc: ./data/HCP1200
+
+tasks:
+  task3:
+    downstream_task_id: 3
+    task_name: diagnosis
+    downstream_task_type: classification
+    num_classes: 4
+
+defaults:
+  dataset_split_num: 1
+  limit_training_samples: 1.0
+  batch_size_override: 2

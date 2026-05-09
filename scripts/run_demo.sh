@@ -18,7 +18,7 @@ python "${DEMO_PY}" \
   --ckpt_path "${CKPT_GENDER}" \
   --task gender \
   --image_path "${DATA_ROOT}" \
-  --devices 1 \
+  --gpu_ids 0 \
   --precision 32
 
 # Age regression
@@ -26,7 +26,7 @@ python "${DEMO_PY}" \
   --ckpt_path "${CKPT_AGE}" \
   --task age \
   --image_path "${DATA_ROOT}" \
-  --devices 1 \
+  --gpu_ids 0 \
   --precision 32 \
   --label_scaling_method standardization
 
@@ -37,6 +37,6 @@ python "${DEMO_PY}" \
   --phenotype_name some_regression_column \
   --phenotype_type regression \
   --image_path "${DATA_ROOT}" \
-  --devices 1 \
+  --gpu_ids 0 \
   --precision 32 \
   --label_scaling_method standardization

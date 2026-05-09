@@ -1,0 +1,25 @@
+dataset_name: TransDiag
+image_path: ./data/TRANS_preprocessed
+image_path_fc: ./data/HCP1200
+
+tasks:
+  task2:
+    downstream_task_id: 2
+    task_name: cgi01_cgi_si
+    downstream_task_type: regression
+    num_classes: 1
+    train_split: 0.8
+    val_split: 0.2
+    dataset_split_num: 2
+    sequence_length_override: 40
+    img_size_override: [96, 96, 96, 40]
+    learning_rate_override: 0.001
+  task3:
+    downstream_task_id: 3
+    task_name: diagnosis
+    downstream_task_type: classification
+    num_classes: 2
+
+defaults:
+  dataset_split_num: 1
+  limit_training_samples: 1.0

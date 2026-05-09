@@ -1,0 +1,14 @@
+model: braingnn
+data_type: fc_graph
+fc_type: partial_correlation
+atlas_name: cc200
+optimizer: SGD
+learning_rate: 0.01
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  pooling_ratio: 0.5
+  num_communities: 8
+  dropout: 0.5

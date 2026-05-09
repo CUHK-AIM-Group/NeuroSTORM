@@ -1,0 +1,18 @@
+model: combraintf
+data_type: fc_bnt
+fc_type: correlation
+atlas_name: cc200
+optimizer: AdamW
+learning_rate: 0.001
+max_epochs: 100
+batch_size: 32
+
+model_args:
+  num_rois: 200
+  num_communities: 10
+  d_model: 128
+  nhead: 4
+  num_layers: 3
+  dim_feedforward: 512
+  use_community_mask: true
+  dropout: 0.1
