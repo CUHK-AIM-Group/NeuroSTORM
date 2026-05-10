@@ -98,7 +98,7 @@ make ci
 # MAE pre-training on NeuroSTORM
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --pretraining \
   --use_mae \
@@ -113,7 +113,7 @@ python main.py \
 # Gender classification
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --load_model_path ./pretrained_models/neurostorm_mae.pth \
   --downstream_task_type classification \
@@ -125,7 +125,7 @@ python main.py \
 # Age regression
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --downstream_task_type regression \
   --task_name age \

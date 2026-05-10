@@ -109,21 +109,21 @@ Run inference on a single preprocessed fMRI subject:
 python demo.py \
   --mode single \
   --ckpt_path ./pretrained_models/age.ckpt \
-  --fmri_path ./data/HCP1200/img/100206 \
+  --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task age
 
 # Gender classification
 python demo.py \
   --mode single \
   --ckpt_path ./pretrained_models/gender.ckpt \
-  --fmri_path ./data/HCP1200/img/100206 \
+  --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task gender
 
 # Phenotype prediction
 python demo.py \
   --mode single \
   --ckpt_path ./pretrained_models/phenotype.ckpt \
-  --fmri_path ./data/HCP1200/img/100206 \
+  --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task phenotype \
   --phenotype_name "CogTotalComp_Unadj" \
   --phenotype_type regression
@@ -158,7 +158,7 @@ sh scripts/run_demo.sh
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --pretraining \
   --use_mae \
@@ -173,7 +173,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model swift \
   --pretraining \
   --use_contrastive \
@@ -190,7 +190,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --load_model_path ./pretrained_models/neurostorm_mae.pth \
   --downstream_task_type classification \
@@ -206,7 +206,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --load_model_path ./pretrained_models/neurostorm_mae.pth \
   --downstream_task_type regression \
@@ -225,7 +225,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --data_type fc_graph \
   --atlas_name cc200 \
   --fc_type partial_correlation \
@@ -242,7 +242,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --data_type fc_bnt \
   --atlas_name cc200 \
   --model bnt \
@@ -259,7 +259,7 @@ python main.py \
 ```bash
 python main.py \
   --dataset_name HCP1200 \
-  --image_path ./data/HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --data_type fc_bnt \
   --atlas_name cc200 \
   --model brainnetcnn \

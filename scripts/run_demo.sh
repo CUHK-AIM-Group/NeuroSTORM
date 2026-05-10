@@ -1,42 +1,66 @@
 #!/usr/bin/env bash
-# Simple examples for running inference-only demo.py on HCP-YA tasks.
-# Fill in DATA_ROOT and checkpoint paths before running.
+# Examples for running inference with demo.py.
+#
+# demo.py supports two modes:
+#   --mode single   : one preprocessed fMRI subject folder (frame_*.pt / frames.h5)
+#   --mode dataset  : full dataset test split (uses image_path)
+#
+# Fill in the placeholder paths before running.
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEMO_PY="${ROOT_DIR}/demo.py"
 
-# TODO: update these paths for your environment
-DATA_ROOT="/path/to/HCP1200"            # e.g., /data/hcp1200-preprocessed
-CKPT_GENDER="/path/to/gender.ckpt"      # checkpoint trained for gender
-CKPT_AGE="/path/to/age.ckpt"            # checkpoint trained for age
-CKPT_PHENO="/path/to/phenotype.ckpt"    # checkpoint trained for phenotype
+# ---------------------------------------------------------------------------
+# Paths — edit these for your environment
+# ---------------------------------------------------------------------------
+CKPT_PATH="/path/to/model.ckpt"              # checkpoint for the chosen task
+FMRI_PATH="/path/to/subject/folder"          # single-subject folder (frame_*.pt / frames.h5)
+IMAGE_PATH="/path/to/preprocessed/data"      # dataset root for --mode dataset
 
-# Gender classification
-python "${DEMO_PY}" \
-  --ckpt_path "${CKPT_GENDER}" \
-  --task gender \
-  --image_path "${DATA_ROOT}" \
-  --gpu_ids 0 \
-  --precision 32
+# ---------------------------------------------------------------------------
+# Single-subject inference
+# ---------------------------------------------------------------------------
 
 # Age regression
 python "${DEMO_PY}" \
-  --ckpt_path "${CKPT_AGE}" \
-  --task age \
-  --image_path "${DATA_ROOT}" \
-  --gpu_ids 0 \
-  --precision 32 \
-  --label_scaling_method standardization
+    --mode single \
+    --ckpt_path "${CKPT_PATH}" \
+    --fmri_path "${FMRI_PATH}" \
+    --task age \
+    --device cuda \
+    --label_scaling_method standardization
 
-# Phenotype prediction
-python "${DEMO_PY}" \
-  --ckpt_path "${CKPT_PHENO}" \
-  --task phenotype \
-  --phenotype_name some_regression_column \
-  --phenotype_type regression \
-  --image_path "${DATA_ROOT}" \
-  --gpu_ids 0 \
-  --precision 32 \
-  --label_scaling_method standardization
+# Gender classification
+# python "${DEMO_PY}" \
+#     --mode single \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --fmri_path "${FMRI_PATH}" \
+#     --task gender \
+#     --device cuda
+
+# Phenotype regression
+# python "${DEMO_PY}" \
+#     --mode single \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --fmri_path "${FMRI_PATH}" \
+#     --task phenotype \
+#     --phenotype_name CogTotalComp_Unadj \
+#     --phenotype_type regression \
+#     --device cuda \
+#     --label_scaling_method standardization
+
+# ---------------------------------------------------------------------------
+# Dataset-level evaluation
+# ---------------------------------------------------------------------------
+
+# Age regression on the full test split
+# python "${DEMO_PY}" \
+#     --mode dataset \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --task age \
+#     --image_path "${IMAGE_PATH}" \
+#     --gpu_ids 0 \
+#     --precision 32 \
+#     --label_scaling_method standardization

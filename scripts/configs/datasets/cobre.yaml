@@ -1,6 +1,6 @@
 dataset_name: Cobre
 image_path: ./data/COBRE_MNI_to_TRs_minmax
-image_path_fc: ./data/HCP1200
+image_path_fc: ./data/HCP1200_MNI_to_TRs_minmax
 
 tasks:
   task3:

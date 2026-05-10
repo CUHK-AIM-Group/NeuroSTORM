@@ -116,6 +116,39 @@ Under the hood:
 Comma-separated `--dataset` is rejected for `finetune`, `train_scratch`, and
 `test` modes because those need a single set of labels.
 
+## FC / Graph Preprocessing
+
+FC-based (`bnt`, `combraintf`, `brainnetcnn`) and graph-based (`braingnn`,
+`lggnn`, `ibgnn`) models don't train on raw fMRI volumes — they need per-subject
+ROI time series and functional-connectivity matrices. Generate them once per
+dataset / atlas with:
+
+```bash
+# bash scripts/preprocess_fc.sh <dataset> [atlas] [fc_types...]
+bash scripts/preprocess_fc.sh hcp1200                                  # cc200, both FC types
+bash scripts/preprocess_fc.sh hcp1200 cc200 correlation                # BNT only
+bash scripts/preprocess_fc.sh adhd200 aal correlation partial_correlation
+```
+
+Outputs land under the dataset's `image_path`:
+
+```
+<image_path>/roi/<atlas>/                # per-subject ROI time series (.npy)
+<image_path>/fc/<atlas>/<fc_type>/       # FC matrices
+```
+
+After preprocessing, train with the universal runner:
+
+```bash
+bash scripts/run_experiment.sh --model bnt     --dataset hcp1200 --task task1 --mode train_scratch
+bash scripts/run_experiment.sh --model braingnn --dataset adhd200 --task task3 --mode train_scratch
+```
+
+## Inference
+
+See [`scripts/run_demo.sh`](run_demo.sh) for example `demo.py` invocations
+covering single-subject inference and dataset-level evaluation.
+
 ## Configuration Structure
 
 ```
@@ -158,7 +191,7 @@ pretrained_ckpt: ./output/neurostorm/pt_neurostorm_mae_ratio0.5.ckpt
 ```yaml
 dataset_name: HCP1200
 image_path: ./data/HCP1200_MNI_to_TRs_minmax
-image_path_fc: ./data/HCP1200     # For FC/graph models
+image_path_fc: ./data/HCP1200_MNI_to_TRs_minmax     # For FC/graph models
 
 tasks:
   task1:

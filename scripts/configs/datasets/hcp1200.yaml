@@ -1,6 +1,6 @@
 dataset_name: HCP1200
 image_path: ./data/HCP1200_MNI_to_TRs_minmax
-image_path_fc: ./data/HCP1200
+image_path_fc: ./data/HCP1200_MNI_to_TRs_minmax
 
 tasks:
   task1:

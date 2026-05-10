@@ -1,6 +1,6 @@
 dataset_name: MOVIE
 image_path: ./data/MOVIE_preprocessed
-image_path_fc: ./data/HCP1200
+image_path_fc: ./data/HCP1200_MNI_to_TRs_minmax
 
 tasks:
   task5:
