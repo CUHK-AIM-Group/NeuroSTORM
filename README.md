@@ -66,9 +66,11 @@ export CUDA_HOME=/usr/local/cuda-12.8
 git clone https://github.com/Dao-AILab/causal-conv1d.git
 cd causal-conv1d
 TORCH_CUDA_ARCH_LIST="12.0" pip install --upgrade --no-cache-dir --no-build-isolation -e .
-cd mamba
+cd ..
 git clone https://github.com/state-spaces/mamba.git
+cd mamba
 TORCH_CUDA_ARCH_LIST="12.0" pip install --upgrade --no-cache-dir --no-build-isolation -e .
+cd ..
 ```
 
 
