@@ -85,7 +85,6 @@ def cli_main():
     parser.add_argument("--load_model_path", type=str, help="A path to the pre-trained model weight file (.pth)")
     parser.add_argument("--test_only", action='store_true', help="Whether to test the checkpoints (model weights)")
     parser.add_argument("--test_ckpt_path", type=str, help="A path to the previous checkpoint that intends to evaluate (--test_only should be True)")
-    parser.add_argument("--freeze_feature_extractor", action='store_true', help="Whether to freeze the feature extractor (for evaluating the pre-trained weight)")
     parser.add_argument("--print_flops", action='store_true', help="Whether to print the number of FLOPs")
     parser.add_argument("--gpu_ids", type=str, default=None, help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, uses all available GPUs")
     parser.add_argument("--num_gpus", type=int, default=None, help="Number of GPUs to use. If not specified, uses all available GPUs or those specified by --gpu_ids")
@@ -281,14 +280,45 @@ def cli_main():
                 new_state_dict[k.removeprefix("model.")] = v
         model.model.load_state_dict(new_state_dict, strict=False)
 
-    if args.freeze_feature_extractor:
-        # layers are frozen by using eval()
+    if getattr(args, 'use_strd', False):
+        if args.use_mae and args.model == 'neurostorm':
+            print(f'[STRD] enabled for MAE: l_spat={args.strd_l_spat}, l_temp={args.strd_l_temp}')
+        else:
+            print('[STRD] WARNING: --use_strd requires --use_mae and --model neurostorm; silently disabled')
+
+    if args.use_prompt_tuning and getattr(args, 'pretraining', False):
+        print('[TPT] WARNING: --use_prompt_tuning is ignored during pretraining')
+
+    if args.use_prompt_tuning and not getattr(args, 'pretraining', False):
+        # Task-specific Prompt Tuning: freeze backbone except per-block prompts;
+        # the output_head remains fully trainable (it's a separate module under `model`).
         model.model.eval()
-        # freeze params
+        n_prompt, n_frozen = 0, 0
         for name, param in model.model.named_parameters():
-            if 'output_head' not in name: # unfreeze only output head
+            if 'prompt' in name:
+                param.requires_grad = True
+                n_prompt += param.numel()
+            else:
                 param.requires_grad = False
-                print(f'freezing layer {name}')
+                n_frozen += param.numel()
+
+        # Also count output_head (trainable by default; lives outside model.model)
+        n_head = 0
+        if getattr(model, 'output_head', None) is not None:
+            n_head = sum(p.numel() for p in model.output_head.parameters() if p.requires_grad)
+
+        n_trainable_total = n_prompt + n_head
+        n_full = n_prompt + n_frozen + n_head  # full-model parameter count
+        pct = (100.0 * n_trainable_total / n_full) if n_full > 0 else 0.0
+        print(f'[TPT] prompt params:   {n_prompt:>12,}')
+        print(f'[TPT] head params:     {n_head:>12,}')
+        print(f'[TPT] trainable total: {n_trainable_total:>12,}')
+        print(f'[TPT] frozen backbone: {n_frozen:>12,}')
+        print(f'[TPT] full model:      {n_full:>12,}')
+        print(f'[TPT] trainable ratio: {pct:.2f}%  (vs. full fine-tuning)')
+        if n_prompt == 0:
+            print('[TPT] WARNING: no parameters with "prompt" in name found. '
+                  'Did you set --prompt_len > 0 with --model neurostorm?')
 
     # ------------ run -------------
     if args.test_only:

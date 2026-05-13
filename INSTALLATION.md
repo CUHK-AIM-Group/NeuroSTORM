@@ -154,7 +154,7 @@ python -c "import torch_geometric; print(f'PyG version: {torch_geometric.__versi
 #### For FC-Based Models (All FC models)
 
 ```bash
-pip install scikit-learn pandas h5py deepdish
+pip install scikit-learn pandas
 ```
 
 ### Step 7: Install Mamba-SSM (for NeuroSTORM only)

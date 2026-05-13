@@ -15,6 +15,12 @@ from torchmetrics.classification import BinaryAccuracy, BinaryAUROC, MulticlassA
 from torchmetrics import  PearsonCorrCoef # Accuracy,
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, roc_curve
 import monai.transforms as monai_t
+import monai.utils.misc
+import monai.transforms.transform
+import monai.transforms.compose
+monai.utils.misc.MAX_SEED = 2**32 - 1
+monai.transforms.transform.MAX_SEED = 2**32 - 1
+monai.transforms.compose.MAX_SEED = 2**32 - 1
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import nibabel as nb
@@ -77,6 +83,10 @@ class LightningModel(pl.LightningModule):
 
         self.metric = Metrics()
 
+    def on_save_checkpoint(self, checkpoint):
+        checkpoint.pop("pytorch-lightning_version", None)
+        checkpoint.pop("global_step", None)
+
     def forward(self, x):
         return self.output_head(self.model(x))
     
@@ -100,7 +110,7 @@ class LightningModel(pl.LightningModule):
         if self.hparams.augment_only_intensity:
             comp = monai_t.Compose([rand_noise, rand_smooth])
         else:
-            comp = monai_t.Compose([rand_affine, rand_noise, rand_smooth]) 
+            comp = monai_t.Compose([rand_affine, rand_noise, rand_smooth])
 
         for b in range(B):
             aug_seed = torch.randint(0, 10000000, (1,)).item()
@@ -263,7 +273,7 @@ class LightningModel(pl.LightningModule):
                     f"{mode}_l1_loss": l1
                 }
         
-        self.log_dict(result_dict, prog_bar=True, sync_dist=False, add_dataloader_idx=False, on_step=True, on_epoch=True, batch_size=self.hparams.batch_size) # batch_size = batch_size
+        self.log_dict(result_dict, prog_bar=True, sync_dist=False, add_dataloader_idx=False, on_step=True, on_epoch=False, batch_size=self.hparams.batch_size)
         
         return loss
 
@@ -277,16 +287,11 @@ class LightningModel(pl.LightningModule):
 
         if self.hparams.task_name == 'movie_classification':
             acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
-            acc3_func = MulticlassAccuracy(num_classes=self.hparams.num_classes, top_k=3).to(total_out_logits.device)
             auroc_func = MulticlassAUROC(num_classes=self.hparams.num_classes).to(total_out_logits.device)
 
             acc = acc_func(total_out_logits, total_out_target.long())
-            acc3 = acc3_func(total_out_logits, total_out_target.long())
-            # auroc = auroc_func(total_out_logits, total_out_target.long())
 
             self.log(f"{mode}_acc", acc, sync_dist=True)
-            self.log(f"{mode}_acc3", acc3, sync_dist=True)
-            # self.log(f"{mode}_AUROC", auroc, sync_dist=True)
             return
 
         if self.hparams.num_classes == 2:
@@ -309,7 +314,6 @@ class LightningModel(pl.LightningModule):
                 acc_func = BinaryAccuracy().to(total_out_logits.device)
             elif self.hparams.num_classes > 2:
                 acc_func = MulticlassAccuracy(num_classes=self.hparams.num_classes).to(total_out_logits.device)
-                acc3_func = MulticlassAccuracy(num_classes=self.hparams.num_classes, top_k=3).to(total_out_logits.device)
 
             if self.hparams.num_classes == 2:
                 auroc_func = BinaryAUROC().to(total_out_logits.device)
@@ -319,11 +323,7 @@ class LightningModel(pl.LightningModule):
             elif self.hparams.num_classes > 2:
                 auroc_func = MulticlassAUROC(num_classes=self.hparams.num_classes).to(total_out_logits.device)
                 acc = acc_func(subj_avg_logits, subj_targets.long())
-                acc3 = acc3_func(subj_avg_logits, subj_targets.long())
-                # bal_acc_sk = balanced_accuracy_score(subj_targets.cpu(), subj_avg_logits.max(dim=1)[1].int().cpu())
                 auroc = auroc_func(subj_avg_logits, subj_targets.long())
-
-                self.log(f"{mode}_acc3", acc3, sync_dist=True)
 
             self.log(f"{mode}_acc", acc, sync_dist=True)
             # self.log(f"{mode}_balacc", bal_acc_sk, sync_dist=True)
@@ -666,6 +666,22 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--clf_head_version", type=str, default="v1", help="clf head version, v2 has a hidden layer")
         group.add_argument("--attn_drop_rate", type=float, default=0, help="dropout rate of attention layers")
         group.add_argument("--reid_gallery_size", type=int, default=None, help="Limit gallery size when evaluating re-identification (use all if unset)")
+
+        # Task-specific Prompt Tuning (NeuroSTORM only)
+        group.add_argument("--use_prompt_tuning", action='store_true',
+                           help="Enable Task-specific Prompt Tuning: freeze backbone except per-block "
+                                "learnable prompts and the output head. Only effective for --model neurostorm.")
+        group.add_argument("--prompt_len", type=int, default=50,
+                           help="Per-block prompt token length k (default 50). Only used when "
+                                "--use_prompt_tuning is set.")
+
+        # Spatiotemporal Redundancy Dropout (NeuroSTORM MAE pretraining only)
+        group.add_argument("--use_strd", action='store_true',
+                           help="Enable STRD during MAE pretraining (--use_mae --model neurostorm).")
+        group.add_argument("--strd_l_spat", type=int, default=5,
+                           help="STRD spatial neighborhood edge length (default 5).")
+        group.add_argument("--strd_l_temp", type=int, default=5,
+                           help="STRD temporal neighborhood edge length (default 5).")
 
         # graph/FC model related
         group.add_argument("--num_rois", type=int, default=200, help="number of ROIs for graph/FC models")

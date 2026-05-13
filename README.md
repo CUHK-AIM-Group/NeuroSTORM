@@ -30,7 +30,8 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 We welcome community contributions! Feel free to submit a PR to add support for your model or dataset.
 
 ## 🚀 Updates
-* __[2026.05.08]__: Added BrainGNN, BNT, LG-GNN, Com-BrainTF, BrainNetCNN and IBGNN support. Framework now supports voxel (4D), ROI (2D), and FC (2D) inputs with dual-format (PT/H5) data loading.
+* __[2026.05.14]__: Added Task-specific Prompt Tuning (`--use_prompt_tuning --prompt_len`) for NeuroSTORM downstream adaptation; switched volume preprocessing to int8 quantization with a single `data.pt` per subject (mmap-based partial reads).
+* __[2026.05.08]__: Added BrainGNN, BNT, LG-GNN, Com-BrainTF, BrainNetCNN and IBGNN support. Framework now supports voxel (4D), ROI (2D), and FC (2D) inputs.
 * __[2026.03.24]__: Our paper has been accepted by [Nature Biomedical Engineering](https://www.nature.com/articles/s41551-026-01666-y).
 * __[2025.12.09]__: Release demo code, including automated data and model downloads. Performed age regression, gender classification, and phenotype prediction on sample data. Release the code for all benchmark tasks (task4).
 * __[2025.06.10]__: Release the [project website](https://cuhk-aim-group.github.io/NeuroSTORM/). Welcome to visit!
@@ -110,12 +111,25 @@ python main.py \
 ### Fine-tuning
 
 ```bash
-# Gender classification
+# Gender classification (full fine-tuning)
 python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
   --load_model_path ./pretrained_models/neurostorm_mae.pth \
+  --downstream_task_type classification \
+  --task_name sex \
+  --num_classes 2 \
+  --batch_size 32 \
+  --max_epochs 50
+
+# Same task with Task-specific Prompt Tuning (freeze backbone, train ~5% params)
+python main.py \
+  --dataset_name HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
+  --model neurostorm \
+  --load_model_path ./pretrained_models/neurostorm_mae.pth \
+  --use_prompt_tuning --prompt_len 50 \
   --downstream_task_type classification \
   --task_name sex \
   --num_classes 2 \
@@ -144,8 +158,7 @@ Our directory structure looks like this:
 ```
 ├── datasets                           <- tools and dataset class
 │   ├── atlas                          <- examples of brain atlas
-│   ├── preprocessing_volume.py        <- remove background, z-normalization, save as pt or h5 files
-│   ├── compute_stats_and_mask.py      <- compute statistics and save as pt or h5 files
+│   ├── preprocessing_volume.py        <- remove background, z-norm, int8 quantize, save one data.pt per subject
 │   ├── generate_roi_data_from_nii.py  <- extract ROI time series from volumetric fMRI
 │   ├── compute_fc.py                  <- compute functional connectivity matrices
 │   ├── compute_atlas_map.py           <- compute atlas map for masking
@@ -181,7 +194,6 @@ Our directory structure looks like this:
 │
 ├── tests                              <- test suite
 │   ├── test_model_loading.py          <- model import and forward pass tests
-│   ├── test_dual_format.py            <- PT/H5 dual format tests
 │   └── test_atlas_masking.py          <- atlas masking tests
 │
 ├── scripts                            <- training and utility scripts

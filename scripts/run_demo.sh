@@ -2,7 +2,7 @@
 # Examples for running inference with demo.py.
 #
 # demo.py supports two modes:
-#   --mode single   : one preprocessed fMRI subject folder (frame_*.pt / frames.h5)
+#   --mode single   : one preprocessed fMRI subject folder (data.pt)
 #   --mode dataset  : full dataset test split (uses image_path)
 #
 # Fill in the placeholder paths before running.
@@ -16,7 +16,7 @@ DEMO_PY="${ROOT_DIR}/demo.py"
 # Paths — edit these for your environment
 # ---------------------------------------------------------------------------
 CKPT_PATH="/path/to/model.ckpt"              # checkpoint for the chosen task
-FMRI_PATH="/path/to/subject/folder"          # single-subject folder (frame_*.pt / frames.h5)
+FMRI_PATH="/path/to/subject/folder"          # single-subject folder (data.pt)
 IMAGE_PATH="/path/to/preprocessed/data"      # dataset root for --mode dataset
 
 # ---------------------------------------------------------------------------

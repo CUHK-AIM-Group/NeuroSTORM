@@ -24,7 +24,7 @@ test-models:  ## Test model loading only
 	pytest tests/test_model_loading.py -v
 
 test-data:  ## Test data loading
-	pytest tests/test_dual_format.py tests/test_atlas_masking.py -v
+	pytest tests/test_atlas_masking.py -v
 
 lint:  ## Run linting checks
 	flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics

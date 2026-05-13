@@ -658,9 +658,7 @@ class fMRIDataModule(pl.LightningDataModule):
                     "downstream_task_id": self.hparams.downstream_task_id,
                     "task_name": self.hparams.task_name,
                     "shuffle_time_sequence": self.hparams.shuffle_time_sequence,
-                    "label_scaling_method": self.hparams.label_scaling_method,
-                    "data_format": self.hparams.data_format,
-                    "dtype": 'float16'}
+                    "label_scaling_method": self.hparams.label_scaling_method}
         elif data_type == 'roi':
             Dataset = ROIDataset
             params = {
@@ -826,7 +824,6 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")
-        group.add_argument("--data_format", type=str, default="auto", choices=["auto", "pt", "h5"], help="data format to load: auto (detect per subject), pt, or h5")
 
         # New arguments for ROI/FC data
         group.add_argument("--data_type", type=str, default="voxel", choices=["voxel", "roi", "fc", "fc_graph", "fc_bnt"],

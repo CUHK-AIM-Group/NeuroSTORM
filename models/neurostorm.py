@@ -164,6 +164,36 @@ def get_window_size(x_size, window_size, shift_size=None):
         return tuple(use_window_size), tuple(use_shift_size)
 
 
+def _build_strd_masks(window_size, l_spat: int, l_temp: int):
+    """Precompute Ω_s(i) and Ω_t(i) boolean masks for a given 4D window.
+
+    Ω_s(i) = { j : max(|d-d_i|, |h-h_i|, |w-w_i|) <= l_spat/2  AND  t_j = t_i  AND j != i }
+    Ω_t(i) = { j : (d_j, h_j, w_j) = (d_i, h_i, w_i)           AND  |t_j - t_i| <= l_temp/2  AND j != i }
+
+    Returns (mask_s, mask_t) each of shape [N, N] bool,  N = prod(window_size).
+    """
+    d, h, w, t = window_size
+    # coord grid in raster order that matches window_partition's flat layout:
+    # window_partition reshapes via permute(0,1,5,2,6,3,7,4,8,9) which flattens
+    # as (d, h, w, t) with d fastest after the head. We need the per-token
+    # (d,h,w,t) index. Empirically the flat index runs d->h->w->t fastest-last.
+    coords = torch.stack(torch.meshgrid(
+        torch.arange(d), torch.arange(h), torch.arange(w), torch.arange(t),
+        indexing='ij'
+    ), dim=-1).reshape(-1, 4)                         # [N, 4]
+    di = coords[:, 0].unsqueeze(1) - coords[:, 0].unsqueeze(0)   # [N, N]
+    hi = coords[:, 1].unsqueeze(1) - coords[:, 1].unsqueeze(0)
+    wi = coords[:, 2].unsqueeze(1) - coords[:, 2].unsqueeze(0)
+    ti = coords[:, 3].unsqueeze(1) - coords[:, 3].unsqueeze(0)
+    half_s = l_spat // 2
+    half_t = l_temp // 2
+    eye = torch.eye(coords.size(0), dtype=torch.bool)
+    spat_inside = (di.abs() <= half_s) & (hi.abs() <= half_s) & (wi.abs() <= half_s)
+    mask_s = spat_inside & (ti == 0) & ~eye
+    mask_t = (di == 0) & (hi == 0) & (wi == 0) & (ti.abs() <= half_t) & ~eye
+    return mask_s, mask_t
+
+
 class WindowAttention4D(nn.Module):
     """
     Window based multi-head self attention module with relative position bias based on: "Liu et al.,
@@ -252,6 +282,10 @@ class SwinTransformerBlock4D(nn.Module):
         act_layer: str = "GELU",
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         use_checkpoint: bool = False,
+        prompt_len: int = 0,
+        use_strd: bool = False,
+        strd_l_spat: int = 5,
+        strd_l_temp: int = 5,
     ) -> None:
         """
         Args:
@@ -267,6 +301,13 @@ class SwinTransformerBlock4D(nn.Module):
             act_layer: activation layer.
             norm_layer: normalization layer.
             use_checkpoint: use gradient checkpointing for reduced memory usage.
+            prompt_len: number of learnable prompt tokens prepended to each window's
+                Mamba input. 0 disables prompt tuning (default).
+            use_strd: enable Spatiotemporal Redundancy Dropout (training-time only).
+                Computes a pseudo-attention matrix from Mamba outputs and drops tokens
+                that are highly redundant in their spatial+temporal neighborhood.
+            strd_l_spat: cubic neighborhood edge length for spatial redundancy (default 5).
+            strd_l_temp: temporal neighborhood edge length (default 5).
         """
 
         super().__init__()
@@ -276,6 +317,10 @@ class SwinTransformerBlock4D(nn.Module):
         self.shift_size = shift_size
         self.mlp_ratio = mlp_ratio
         self.use_checkpoint = use_checkpoint
+        self.prompt_len = int(prompt_len)
+        self.use_strd = bool(use_strd)
+        self.strd_l_spat = int(strd_l_spat)
+        self.strd_l_temp = int(strd_l_temp)
 
         self.norm1 = norm_layer(dim)
 
@@ -290,6 +335,26 @@ class SwinTransformerBlock4D(nn.Module):
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(hidden_size=dim, mlp_dim=mlp_hidden_dim, act=act_layer, dropout_rate=drop, dropout_mode="swin")
+
+        # Task-specific Prompt Tuning (TPT): one learnable prefix per block, prepended
+        # to each window's Mamba input. Backbone params can be frozen while these
+        # prompts are trained for downstream task adaptation.
+        if self.prompt_len > 0:
+            self.prompt = nn.Parameter(torch.zeros(1, self.prompt_len, dim))
+            trunc_normal_(self.prompt, std=0.02)
+        else:
+            self.register_parameter('prompt', None)
+
+        # STRD: precompute window-local Ω_s / Ω_t neighborhood masks once.
+        # The window has fixed shape (d, h, w, t) = window_size, so the masks are
+        # constant across forward passes. Stored as bool buffers (no grad).
+        if self.use_strd:
+            mask_s, mask_t = _build_strd_masks(window_size, self.strd_l_spat, self.strd_l_temp)
+            self.register_buffer('strd_mask_s', mask_s, persistent=False)
+            self.register_buffer('strd_mask_t', mask_t, persistent=False)
+            # Cached row-sums (broadcast in forward to save flops)
+            self.register_buffer('strd_card_s', mask_s.sum(dim=-1).to(torch.float32), persistent=False)
+            self.register_buffer('strd_card_t', mask_t.sum(dim=-1).to(torch.float32), persistent=False)
 
     def forward_part1(self, x, mask_matrix):
         b, d, h, w, t, c = x.shape
@@ -312,7 +377,22 @@ class SwinTransformerBlock4D(nn.Module):
             shifted_x = x
             attn_mask = None
         x_windows = window_partition(shifted_x, window_size)
-        attn_windows = self.mamba(x_windows)
+        if self.prompt_len > 0 and self.prompt is not None:
+            # prepend learnable prompt tokens to each window's Mamba input,
+            # then strip them from the output so spatial structure is preserved
+            prompt = self.prompt.expand(x_windows.size(0), -1, -1)
+            x_windows = torch.cat([prompt, x_windows], dim=1)
+            attn_windows = self.mamba(x_windows)
+            attn_windows = attn_windows[:, self.prompt_len:, :]
+        else:
+            attn_windows = self.mamba(x_windows)
+
+        # STRD (Spatiotemporal Redundancy Dropout): build a pseudo-attention from
+        # the Mamba outputs, score per-token redundancy via paper Eq. (1)-(3), and
+        # randomly zero highly-redundant tokens. Active during training only.
+        if self.use_strd and self.training:
+            attn_windows = self._apply_strd(attn_windows)
+
         attn_windows = attn_windows.view(-1, *(window_size + (c,)))
         shifted_x = window_reverse(attn_windows, window_size, dims)
         if any(i > 0 for i in shift_size):
@@ -330,6 +410,55 @@ class SwinTransformerBlock4D(nn.Module):
     def forward_part2(self, x):
         x = self.drop_path(self.mlp(self.norm2(x)))
         return x
+
+    def _apply_strd(self, h):
+        """Spatiotemporal Redundancy Dropout (paper Eq. 1-3, Mamba-adapted).
+
+        Args:
+            h: Mamba output tokens, shape [B*nw, N, C], N = prod(window_size)
+
+        Returns:
+            tokens with high spatiotemporal redundancy stochastically zeroed
+            (same shape; gradients flow through the multiplicative gate).
+        """
+        # 1. pseudo attention: similarity from Mamba outputs alone (no extra params)
+        scale = h.size(-1) ** -0.5
+        A_hat = torch.softmax(h @ h.transpose(-2, -1) * scale, dim=-1)        # [B*nw, N, N]
+
+        mask_s = self.strd_mask_s                                              # [N, N] bool
+        mask_t = self.strd_mask_t
+
+        # 2. f_spat / f_temp: max attention inside each neighborhood
+        # use masked_fill(-inf) so empty neighborhoods stay safely small (max → -inf, clamped)
+        neg_inf = torch.finfo(A_hat.dtype).min
+        f_spat = A_hat.masked_fill(~mask_s, neg_inf).max(dim=-1).values        # [B*nw, N]
+        f_temp = A_hat.masked_fill(~mask_t, neg_inf).max(dim=-1).values
+        f_spat = f_spat.clamp(min=0.0)
+        f_temp = f_temp.clamp(min=0.0)
+
+        # 3. row-sums over neighborhoods (denominators in Eq. 3)
+        eps = 1e-8
+        sum_s = (A_hat * mask_s).sum(dim=-1, keepdim=True)                     # [B*nw, N, 1]
+        sum_t = (A_hat * mask_t).sum(dim=-1, keepdim=True)
+        # 4. element-wise dropout probability W (Eq. 3)
+        # Guard: where a neighborhood is empty, sum is 0 → avoid large values from /eps
+        has_s = (self.strd_card_s > 0).unsqueeze(0).unsqueeze(-1)              # [1, N, 1]
+        has_t = (self.strd_card_t > 0).unsqueeze(0).unsqueeze(-1)
+        term_s = torch.where(has_s, f_temp.unsqueeze(-1) * A_hat / (sum_s + eps),
+                             torch.zeros_like(A_hat))
+        term_t = torch.where(has_t, f_spat.unsqueeze(-1) * A_hat / (sum_t + eps),
+                             torch.zeros_like(A_hat))
+        W = (0.5 * (term_s + term_t)).clamp(0.0, 1.0)
+
+        # 5. aggregate to per-token redundancy score, then Bernoulli-drop those tokens.
+        # Paper drops attention elements; Mamba has no attention to drop, so we drop
+        # the entire token if its summed redundancy is high. card_s+card_t is constant
+        # per row so it's just a normalization.
+        card = (self.strd_card_s + self.strd_card_t).clamp(min=1.0)            # [N]
+        score = W.sum(dim=-1) / card.unsqueeze(0)                              # [B*nw, N]
+        score = score.clamp(0.0, 1.0)
+        keep = 1.0 - torch.bernoulli(score)                                    # [B*nw, N], 1 keep / 0 drop
+        return h * keep.unsqueeze(-1)
 
     def forward(self, x, mask_matrix):
         shortcut = x
@@ -457,7 +586,11 @@ class BasicLayer(nn.Module):
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         c_multiplier: int = 2,
         downsample: Optional[nn.Module] = None,
-        use_checkpoint: bool = False
+        use_checkpoint: bool = False,
+        prompt_len: int = 0,
+        use_strd: bool = False,
+        strd_l_spat: int = 5,
+        strd_l_temp: int = 5,
     ) -> None:
         """
         Args:
@@ -473,6 +606,10 @@ class BasicLayer(nn.Module):
             norm_layer: normalization layer.
             downsample: an optional downsampling layer at the end of the layer.
             use_checkpoint: use gradient checkpointing for reduced memory usage.
+            prompt_len: per-block learnable prompt length (0 disables).
+            use_strd: enable Spatiotemporal Redundancy Dropout in every block.
+            strd_l_spat: spatial neighborhood edge length.
+            strd_l_temp: temporal neighborhood edge length.
         """
 
         super().__init__()
@@ -494,7 +631,11 @@ class BasicLayer(nn.Module):
                     attn_drop=attn_drop,
                     drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint
+                    use_checkpoint=use_checkpoint,
+                    prompt_len=prompt_len,
+                    use_strd=use_strd,
+                    strd_l_spat=strd_l_spat,
+                    strd_l_temp=strd_l_temp,
                 )
                 for i in range(depth)
             ]
@@ -523,7 +664,7 @@ class BasicLayer(nn.Module):
         x = rearrange(x, "b d h w t c -> b c d h w t")
 
         return x
-    
+
 
 class BasicLayerUp(nn.Module):
     def __init__(
@@ -615,7 +756,11 @@ class BasicLayer_FullAttention(nn.Module):
         norm_layer: Type[LayerNorm] = nn.LayerNorm,
         c_multiplier: int = 2,
         downsample: Optional[nn.Module] = None,
-        use_checkpoint: bool = False
+        use_checkpoint: bool = False,
+        prompt_len: int = 0,
+        use_strd: bool = False,
+        strd_l_spat: int = 5,
+        strd_l_temp: int = 5,
     ) -> None:
         """
         Args:
@@ -631,6 +776,10 @@ class BasicLayer_FullAttention(nn.Module):
             norm_layer: normalization layer.
             downsample: an optional downsampling layer at the end of the layer.
             use_checkpoint: use gradient checkpointing for reduced memory usage.
+            prompt_len: per-block learnable prompt length (0 disables).
+            use_strd: enable Spatiotemporal Redundancy Dropout in every block.
+            strd_l_spat: spatial neighborhood edge length.
+            strd_l_temp: temporal neighborhood edge length.
         """
 
         super().__init__()
@@ -652,7 +801,11 @@ class BasicLayer_FullAttention(nn.Module):
                     attn_drop=attn_drop,
                     drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
                     norm_layer=norm_layer,
-                    use_checkpoint=use_checkpoint
+                    use_checkpoint=use_checkpoint,
+                    prompt_len=prompt_len,
+                    use_strd=use_strd,
+                    strd_l_spat=strd_l_spat,
+                    strd_l_temp=strd_l_temp,
                 )
                 for i in range(depth)
             ]
@@ -750,6 +903,7 @@ class NeuroSTORM(nn.Module):
         last_layer_full_MSA: bool = False,
         downsample="mergingv2",
         num_classes=2,
+        prompt_len: int = 0,
         **kwargs,
     ) -> None:
         """
@@ -828,7 +982,8 @@ class NeuroSTORM(nn.Module):
             norm_layer=norm_layer,
             c_multiplier=c_multiplier,
             downsample=down_sample_mod if 0 < self.num_layers - 1 else None,
-            use_checkpoint=use_checkpoint
+            use_checkpoint=use_checkpoint,
+            prompt_len=prompt_len,
         )
         self.layers.append(layer)
 
@@ -847,7 +1002,8 @@ class NeuroSTORM(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=down_sample_mod if i_layer < self.num_layers - 1 else None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
             )
             self.layers.append(layer)
 
@@ -865,7 +1021,8 @@ class NeuroSTORM(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
             )
             self.layers.append(layer)
 
@@ -893,7 +1050,8 @@ class NeuroSTORM(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
             )
             self.layers.append(layer)
 
@@ -942,6 +1100,10 @@ class NeuroSTORMMAE(nn.Module):
         spatial_mask="random",
         time_mask="random",
         atlas_map_path=None,
+        prompt_len: int = 0,
+        use_strd: bool = False,
+        strd_l_spat: int = 5,
+        strd_l_temp: int = 5,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -1009,7 +1171,11 @@ class NeuroSTORMMAE(nn.Module):
             norm_layer=norm_layer,
             c_multiplier=c_multiplier,
             downsample=down_sample_mod if 0 < self.num_layers - 1 else None,
-            use_checkpoint=use_checkpoint
+            use_checkpoint=use_checkpoint,
+            prompt_len=prompt_len,
+            use_strd=use_strd,
+            strd_l_spat=strd_l_spat,
+            strd_l_temp=strd_l_temp,
         )
         self.layers.append(layer)
 
@@ -1028,7 +1194,11 @@ class NeuroSTORMMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=down_sample_mod if i_layer < self.num_layers - 1 else None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
+                use_strd=use_strd,
+                strd_l_spat=strd_l_spat,
+                strd_l_temp=strd_l_temp,
             )
             self.layers.append(layer)
 
@@ -1046,7 +1216,11 @@ class NeuroSTORMMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
+                use_strd=use_strd,
+                strd_l_spat=strd_l_spat,
+                strd_l_temp=strd_l_temp,
             )
             self.layers.append(layer)
         else:
@@ -1073,7 +1247,11 @@ class NeuroSTORMMAE(nn.Module):
                 norm_layer=norm_layer,
                 c_multiplier=c_multiplier,
                 downsample=None,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint,
+                prompt_len=prompt_len,
+                use_strd=use_strd,
+                strd_l_spat=strd_l_spat,
+                strd_l_temp=strd_l_temp,
             )
             self.layers.append(layer)
         

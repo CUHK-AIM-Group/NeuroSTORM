@@ -34,6 +34,9 @@ def load_model(model_name, hparams=None):
                 spatial_mask=hparams.spatial_mask,
                 time_mask=hparams.time_mask,
                 atlas_map_path=getattr(hparams, 'atlas_map_path', None),
+                use_strd=getattr(hparams, 'use_strd', False),
+                strd_l_spat=getattr(hparams, 'strd_l_spat', 5),
+                strd_l_temp=getattr(hparams, 'strd_l_temp', 5),
             )
         else:
             net = NeuroSTORM(
@@ -49,7 +52,9 @@ def load_model(model_name, hparams=None):
                 last_layer_full_MSA=hparams.last_layer_full_MSA,
                 drop_rate=hparams.attn_drop_rate,
                 drop_path_rate=hparams.attn_drop_rate,
-                attn_drop_rate=hparams.attn_drop_rate
+                attn_drop_rate=hparams.attn_drop_rate,
+                prompt_len=(getattr(hparams, 'prompt_len', 0)
+                            if getattr(hparams, 'use_prompt_tuning', False) else 0),
             )
     elif model_name == "swift":
         from .swift import SwiFT

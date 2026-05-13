@@ -7,7 +7,6 @@ This directory contains unit tests and integration tests for the NeuroSTORM plat
 ```
 tests/
 ├── __init__.py                 # Test package initialization
-├── test_dual_format.py         # Tests for PT/H5 dual format support
 ├── test_atlas_masking.py       # Tests for atlas masking functionality
 ├── test_model_loading.py       # Tests for model loading and initialization
 └── README.md                   # This file

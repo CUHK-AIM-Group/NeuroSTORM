@@ -43,7 +43,6 @@ jobs:
         pip install pytorch-lightning==1.9.4
         pip install numpy scipy pandas scikit-learn
         pip install nibabel nilearn monai
-        pip install h5py
         pip install einops
 
     - name: Install PyTorch Geometric (CPU)

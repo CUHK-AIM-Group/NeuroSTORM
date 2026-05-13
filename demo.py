@@ -104,56 +104,43 @@ def _task_config(task, args, base_hparams):
 # Single-file helpers
 # ---------------------------------------------------------------------------
 
-def _detect_format(subject_path: str) -> str:
-    if os.path.isfile(os.path.join(subject_path, "frames.h5")):
-        return "h5"
-    elif any(f.startswith("frame_") and f.endswith(".pt") for f in os.listdir(subject_path)):
-        return "pt"
-    else:
-        raise ValueError(f"No valid fMRI data found in {subject_path}")
+def _load_single_subject(subject_path, sequence_length, stride_within_seq=1):
+    """Load a clip of ``sequence_length`` frames from ``subject_path``.
 
+    Supports both storage layouts:
+      * new int8 blob: ``subject_path/data.pt`` (mmap-based partial read)
+      * legacy per-frame: ``subject_path/frame_*.pt`` (float16)
 
-def _load_frames_pt(subject_path, sequence_length, stride_within_seq):
-    frame_files = sorted(
-        f for f in os.listdir(subject_path) if f.startswith("frame_") and f.endswith(".pt")
-    )
-    num_frames = len(frame_files)
+    Returns a float32 tensor of shape [1, H, W, D, T].
+    """
+    blob_path = os.path.join(subject_path, "data.pt")
     need = sequence_length * stride_within_seq
+
+    if os.path.isfile(blob_path):
+        blob = torch.load(blob_path, mmap=True, weights_only=True)
+        frames = blob['frames']                   # int8 [T, H, W, D]
+        scale = float(blob['scale'])
+        num_frames = int(blob['num_frames'])
+        if num_frames < need:
+            raise ValueError(f"Not enough frames: have {num_frames}, need at least {need}")
+        clip = frames[0:need:stride_within_seq].to(torch.float32).mul_(scale)
+        return clip.permute(1, 2, 3, 0).unsqueeze(0)
+
+    # legacy per-frame format
+    frame_files = [f for f in os.listdir(subject_path)
+                   if f.startswith("frame_") and f.endswith(".pt")]
+    num_frames = len(frame_files)
+    if num_frames == 0:
+        raise FileNotFoundError(f"No data.pt and no frame_*.pt found in {subject_path}")
     if num_frames < need:
         raise ValueError(f"Not enough frames: found {num_frames}, need at least {need}")
-
-    frames = []
+    parts = []
     for i in range(0, need, stride_within_seq):
-        frame = torch.load(os.path.join(subject_path, f"frame_{i}.pt")).unsqueeze(0)
-        frames.append(frame)
-    return torch.cat(frames, dim=4)
-
-
-def _load_frames_h5(subject_path, sequence_length, stride_within_seq):
-    import h5py
-
-    h5_path = os.path.join(subject_path, "frames.h5")
-    if not os.path.exists(h5_path):
-        raise FileNotFoundError(f"H5 file not found: {h5_path}")
-
-    with h5py.File(h5_path, "r") as h5f:
-        num_frames = len([k for k in h5f.keys() if k.startswith("frame_")])
-        need = sequence_length * stride_within_seq
-        if num_frames < need:
-            raise ValueError(f"Not enough frames: found {num_frames}, need at least {need}")
-
-        frames = []
-        for i in range(0, need, stride_within_seq):
-            frame = torch.from_numpy(h5f[f"frame_{i}"][()]).unsqueeze(0)
-            frames.append(frame)
-    return torch.cat(frames, dim=4)
-
-
-def _load_single_subject(subject_path, sequence_length, stride_within_seq=1):
-    fmt = _detect_format(subject_path)
-    if fmt == "h5":
-        return _load_frames_h5(subject_path, sequence_length, stride_within_seq)
-    return _load_frames_pt(subject_path, sequence_length, stride_within_seq)
+        frame = torch.load(os.path.join(subject_path, f"frame_{i}.pt"),
+                           weights_only=True).to(torch.float32)
+        parts.append(frame)
+    clip = torch.cat(parts, dim=3)       # [H, W, D, T]
+    return clip.unsqueeze(0)             # [1, H, W, D, T]
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +163,6 @@ def run_single(args):
     img_size = base_hparams.get("img_size", [96, 96, 96, 20])
 
     print(f"Loading fMRI data from {args.fmri_path}...")
-    fmt = _detect_format(args.fmri_path)
-    print(f"Detected format: {fmt.upper()}")
-
     volume = _load_single_subject(args.fmri_path, sequence_length, stride_within_seq)
     volume = pad_to_96(volume)
     volume = resize_volume(volume, img_size)
@@ -240,7 +224,6 @@ def run_dataset(args):
         use_contrastive=False,
         use_mae=False,
         test_only=True,
-        freeze_feature_extractor=args.freeze_feature_extractor,
     )
 
     if args.image_path:
@@ -299,7 +282,7 @@ def parse_args():
     # --- single mode ---
     single = parser.add_argument_group("single-file mode")
     single.add_argument("--fmri_path", default=None,
-                        help="Path to subject folder containing frame_*.pt or frames.h5")
+                        help="Path to subject folder containing data.pt or frame_*.pt")
     single.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
                         help="Device to use (single mode only)")
     single.add_argument("--sequence_length", type=int, default=None,
@@ -317,7 +300,6 @@ def parse_args():
     ds.add_argument("--eval_batch_size", type=int, default=None)
     ds.add_argument("--num_workers", type=int, default=None)
     ds.add_argument("--with_voxel_norm", type=str2bool, default=None)
-    ds.add_argument("--freeze_feature_extractor", action="store_true")
     ds.add_argument("--devices", default=None)
     ds.add_argument("--accelerator", default=None)
     ds.add_argument("--precision", default=None)

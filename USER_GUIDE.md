@@ -41,33 +41,29 @@ bash brain_extraction.sh /path/to/your/dataset /path/to/output/dataset
 
 #### Volume Pre-processing
 
-We support two data formats:
+Each subject's rfMRI is spatially resampled to 2 mm iso, temporally resampled to TR=0.8 s,
+center-cropped to 96³, z-normalized, **symmetrically quantized to int8 (plus one per-subject
+`scale`)**, and stored as a single `data.pt` per subject (`[T, H, W, D]` layout for
+mmap-friendly clip reads).
 
-| Format | Disk Usage | Random Access | Best For |
-|--------|------------|---------------|----------|
-| **PT** | Larger | Fastest | Small datasets, debugging |
-| **H5** | Smaller | Fast | Large datasets, limited disk space |
-
-**Using PT format:**
 ```bash
 cd NeuroSTORM/datasets
 python preprocessing_volume.py \
   --dataset_name hcp \
   --load_root ./data/hcp \
   --save_root ./processed_data/hcp \
-  --output_format pt \
   --num_processes 8
 ```
 
-**Using H5 format:**
-```bash
-python preprocessing_volume.py \
-  --dataset_name hcp \
-  --load_root ./data/hcp \
-  --save_root ./processed_data/hcp \
-  --output_format h5 \
-  --num_processes 8
-```
+Output: `./processed_data/hcp/img/<subject_id>/data.pt` — a dict with
+`{'frames': int8[T, 96, 96, 96], 'scale': float, 'num_frames': int}`.
+Dequantize at load time with `frames.to(torch.float32) * scale`.
+
+> **Legacy format compatibility**: the loader also accepts data preprocessed
+> by earlier versions (per-frame `frame_*.pt` float16 files). If a subject
+> directory contains `data.pt`, the new format is used; otherwise the loader
+> falls back to `frame_*.pt`. You do not need to re-run preprocessing on
+> existing datasets.
 
 ### 1.3 Converting 4D Volume to 2D ROIs
 
@@ -273,31 +269,21 @@ python main.py \
 
 ## 4. Fine-tuning
 
-### 4.1 Data Format Selection
-
-During training, specify which data format to load:
-
-```bash
-# Auto-detect format (recommended)
-python main.py --data_format auto ...
-
-# Force PT format
-python main.py --data_format pt ...
-
-# Force H5 format
-python main.py --data_format h5 ...
-```
-
-### 4.2 Loading Pre-trained Weights
+### 4.1 Loading Pre-trained Weights
 
 ```bash
 python main.py \
   --load_model_path ./pretrained_models/neurostorm_mae.pth \
-  --freeze_feature_extractor \  # Optional: freeze backbone
+  --use_prompt_tuning \              # freeze backbone, train per-block prompts + head
+  --prompt_len 50 \                  # k = 50 prompt tokens per block (default)
   ...
 ```
 
-### 4.3 Resume Training
+`--use_prompt_tuning` enables Task-specific Prompt Tuning (TPT, NeuroSTORM only). The
+backbone is frozen and only learnable prompts (one set per Swin block) plus the output
+head are trained. Console prints the trainable / full-model parameter ratio at startup.
+
+### 4.2 Resume Training
 
 ```bash
 python main.py \

@@ -36,7 +36,7 @@ RUN pip install torch-geometric && \
     pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 
 # 9. Install additional dependencies for FC computation and data processing
-RUN pip install scikit-learn pandas h5py deepdish
+RUN pip install scikit-learn pandas
 
 # 10. Clone and install causal-conv1d
 RUN git clone https://github.com/Dao-AILab/causal-conv1d.git /opt/causal-conv1d \

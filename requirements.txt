@@ -33,8 +33,6 @@ torch-geometric
 #   pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 
 # Data processing
-h5py
-deepdish
 
 # Development tools
 ipdb
