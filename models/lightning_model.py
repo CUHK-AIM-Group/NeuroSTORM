@@ -128,8 +128,51 @@ class LightningModel(pl.LightningModule):
         return img
     
     def _compute_logits(self, batch, augment_during_training=None):
+        # Handle PyG graph batch (BrainGNN, LG-GNN, etc.)
+        if hasattr(batch, 'edge_index'):
+            out = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.batch, batch.pos)
+            if isinstance(out, tuple):
+                logits = out[0]
+            else:
+                logits = out
+            subj = batch.subject_name if hasattr(batch, 'subject_name') else None
+            target_value = batch.y.float()
+            head_features = None
+            if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+                logits = logits.squeeze()
+                target = target_value.squeeze()
+            else:
+                unnormalized_target = target_value
+                if self.hparams.label_scaling_method == 'standardization':
+                    target = (unnormalized_target - self.scaler.mean_[0]) / (self.scaler.scale_[0])
+                elif self.hparams.label_scaling_method == 'minmax':
+                    target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
+            return subj, logits, target, head_features
+
+        # Handle FC/BNT dict batch (4 keys: node_feature/fc_matrix, subject_name, target, sex)
+        if isinstance(batch, dict) and ('node_feature' in batch or 'fc_matrix' in batch):
+            fmri = batch.get('node_feature', batch.get('fc_matrix'))
+            subj = batch['subject_name']
+            target_value = batch['target']
+            out = self.model(fmri)
+            if isinstance(out, tuple):
+                logits = out[0]
+            else:
+                logits = out
+            head_features = None
+            if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
+                logits = logits.squeeze()
+                target = target_value.float().squeeze()
+            else:
+                unnormalized_target = target_value.float()
+                if self.hparams.label_scaling_method == 'standardization':
+                    target = (unnormalized_target - self.scaler.mean_[0]) / (self.scaler.scale_[0])
+                elif self.hparams.label_scaling_method == 'minmax':
+                    target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
+            return subj, logits, target, head_features
+
         fmri, subj, target_value, tr, sex = batch.values()
-       
+
         if augment_during_training:
             fmri = self.augment(fmri)
 
@@ -252,10 +295,10 @@ class LightningModel(pl.LightningModule):
             self.start_time_data = time.time()
 
             if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
-                if self.hparams.num_classes == 2:
+                if self.hparams.num_classes == 2 and logits.dim() == 1:
                     loss = F.binary_cross_entropy_with_logits(logits, target)
                     acc = self.metric.get_accuracy_binary(logits, target.float().squeeze())
-                elif self.hparams.num_classes > 2:
+                else:
                     loss = F.cross_entropy(logits, target.long().squeeze())
                     acc = self.metric.get_accuracy(logits, target.float().squeeze())
                 
@@ -294,20 +337,27 @@ class LightningModel(pl.LightningModule):
             self.log(f"{mode}_acc", acc, sync_dist=True)
             return
 
-        if self.hparams.num_classes == 2:
+        if self.hparams.num_classes == 1:
             for subj in subjects:
                 subj_logits = total_out_logits[subj_array == subj]
                 subj_avg_logits.append(torch.mean(subj_logits).item())
                 subj_targets.append(total_out_target[subj_array == subj][0].item())
-            subj_avg_logits = torch.tensor(subj_avg_logits, device = total_out_logits.device) 
-            subj_targets = torch.tensor(subj_targets, device = total_out_target.device) 
+            subj_avg_logits = torch.tensor(subj_avg_logits, device=total_out_logits.device)
+            subj_targets = torch.tensor(subj_targets, device=total_out_target.device)
+        elif self.hparams.num_classes == 2:
+            for subj in subjects:
+                subj_logits = total_out_logits[subj_array == subj]
+                subj_avg_logits.append(torch.mean(subj_logits).item())
+                subj_targets.append(total_out_target[subj_array == subj][0].item())
+            subj_avg_logits = torch.tensor(subj_avg_logits, device = total_out_logits.device)
+            subj_targets = torch.tensor(subj_targets, device = total_out_target.device)
         elif self.hparams.num_classes > 2:
             for subj in subjects:
                 subj_logits = total_out_logits[subj_array == subj]
                 subj_avg_logits.append(torch.mean(subj_logits, dim=0))
                 subj_targets.append(total_out_target[subj_array == subj][0].item())
-            subj_avg_logits = torch.stack(subj_avg_logits) 
-            subj_targets = torch.tensor(subj_targets, device = total_out_target.device) 
+            subj_avg_logits = torch.stack(subj_avg_logits)
+            subj_targets = torch.tensor(subj_targets, device = total_out_target.device)
 
         if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
             if self.hparams.num_classes == 2:
@@ -448,21 +498,25 @@ class LightningModel(pl.LightningModule):
             subj_test = np.array(subj_test)
             total_out_valid_logits = torch.cat(out_valid_logits_list, dim=0)
             total_out_valid_target = torch.cat(out_valid_target_list, dim=0)
-            total_out_test_logits = torch.cat(out_test_logits_list, dim=0)
-            total_out_test_target = torch.cat(out_test_target_list, dim=0)
 
             if self.hparams.task_name == 'fmri_reid':
                 valid_feat_list = [f for f in out_valid_feat_list if f is not None]
-                test_feat_list = [f for f in out_test_feat_list if f is not None]
                 if len(valid_feat_list) > 0:
                     total_out_valid_feat = torch.cat(valid_feat_list, dim=0)
                     self._evaluate_reid(subj_valid, total_out_valid_feat, total_out_valid_target, mode="valid")
-                if len(test_feat_list) > 0:
-                    total_out_test_feat = torch.cat(test_feat_list, dim=0)
-                    self._evaluate_reid(subj_test, total_out_test_feat, total_out_test_target, mode="test")
             else:
                 self._evaluate_metrics(subj_valid, total_out_valid_logits, total_out_valid_target, mode="valid")
-                self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
+
+            if len(out_test_logits_list) > 0:
+                total_out_test_logits = torch.cat(out_test_logits_list, dim=0)
+                total_out_test_target = torch.cat(out_test_target_list, dim=0)
+                if self.hparams.task_name == 'fmri_reid':
+                    test_feat_list = [f for f in out_test_feat_list if f is not None]
+                    if len(test_feat_list) > 0:
+                        total_out_test_feat = torch.cat(test_feat_list, dim=0)
+                        self._evaluate_reid(subj_test, total_out_test_feat, total_out_test_target, mode="test")
+                else:
+                    self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
             
     # If you use loggers other than Neptune you may need to modify this
     def _save_predictions(self,total_subjs,total_out, mode):

@@ -11,10 +11,6 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torch_geometric.data import Data
-import networkx as nx
-from networkx.convert_matrix import from_numpy_array
-from torch_geometric.utils import remove_self_loops
-from torch_sparse import coalesce
 
 
 class ROIDataset(Dataset):
@@ -55,6 +51,7 @@ class ROIDataset(Dataset):
         self.train = train
 
         self.data = self._set_data()
+        self.target_values = np.array([t[2] for t in self.data]).reshape(-1, 1)
 
     def _set_data(self):
         """Build list of (subject_id, subject_path, target, sex) tuples."""
@@ -136,6 +133,7 @@ class FCDataset(Dataset):
         self.return_format = return_format
 
         self.data = self._set_data()
+        self.target_values = np.array([t[2] for t in self.data]).reshape(-1, 1)
 
     def _set_data(self):
         """Build list of (subject_id, fc_path, target, sex) tuples."""
@@ -161,6 +159,7 @@ class FCDataset(Dataset):
 
         # Load FC matrix: (num_rois, num_rois)
         fc_matrix = np.load(fc_file)
+        np.fill_diagonal(fc_matrix, 0.0)
 
         # Convert to tensor
         fc_tensor = torch.from_numpy(fc_matrix).float()
@@ -222,6 +221,7 @@ class FCGraphDataset(Dataset):
         self.train = train
 
         self.data = self._set_data()
+        self.target_values = np.array([t[3] for t in self.data]).reshape(-1, 1)
 
     def _set_data(self):
         """Build list of (subject_id, fc_path, corr_path, target, sex) tuples."""
@@ -247,43 +247,20 @@ class FCGraphDataset(Dataset):
     def __getitem__(self, idx):
         subject_id, fc_file, corr_file, target, sex = self.data[idx]
 
-        # Load partial correlation for edges
-        pcorr = np.load(fc_file)
-        pcorr = np.abs(pcorr)  # Use absolute values
-
-        # Load correlation for node features
+        # Load correlation for node features and edge weights
         corr = np.load(corr_file)
+        np.fill_diagonal(corr, 0.0)
 
-        num_nodes = pcorr.shape[0]
+        num_nodes = corr.shape[0]
 
-        # Convert to graph
-        G = from_numpy_array(pcorr)
-        A = nx.to_scipy_sparse_matrix(G)
-        adj = A.tocoo()
+        # Build full graph using |correlation| as edge weights
+        abs_corr = np.abs(corr)
+        mask = abs_corr > 0
+        src, dst = np.nonzero(mask)
+        edge_index = torch.tensor(np.stack([src, dst]), dtype=torch.long)
+        edge_attr = torch.tensor(abs_corr[src, dst], dtype=torch.float).unsqueeze(-1)
 
-        # Extract edges and edge attributes
-        edge_att = np.zeros(len(adj.row))
-        for i in range(len(adj.row)):
-            edge_att[i] = pcorr[adj.row[i], adj.col[i]]
-
-        edge_index = np.stack([adj.row, adj.col])
-        edge_index, edge_att = remove_self_loops(
-            torch.from_numpy(edge_index).long(),
-            torch.from_numpy(edge_att).float()
-        )
-
-        # Coalesce edges
-        edge_index, edge_att = coalesce(
-            edge_index, edge_att, num_nodes, num_nodes
-        )
-
-        # Apply threshold if specified
-        if self.threshold is not None:
-            mask = edge_att.abs() > self.threshold
-            edge_index = edge_index[:, mask]
-            edge_att = edge_att[mask]
-
-        # Node features (correlation matrix)
+        # Node features (correlation matrix with zeroed diagonal)
         x = torch.from_numpy(corr).float()
 
         # Position encoding (identity matrix for ROI positions)
@@ -293,8 +270,8 @@ class FCGraphDataset(Dataset):
         data = Data(
             x=x,
             edge_index=edge_index,
-            edge_attr=edge_att.unsqueeze(-1),
-            y=torch.tensor([target]).long(),
+            edge_attr=edge_attr,
+            y=torch.tensor([target]).float(),
             pos=pos
         )
 

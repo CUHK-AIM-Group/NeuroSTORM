@@ -162,9 +162,10 @@ class TransPoolingEncoder(nn.Module):
                  freeze_center=False, project_assignment=True):
         super().__init__()
 
+        nhead = 4 if input_feature_size % 4 == 0 else (2 if input_feature_size % 2 == 0 else 1)
         self.transformer = InterpretableTransformerEncoder(
             d_model=input_feature_size,
-            nhead=4,
+            nhead=nhead,
             dim_feedforward=hidden_size,
             batch_first=True
         )

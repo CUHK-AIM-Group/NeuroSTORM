@@ -106,6 +106,11 @@ def load_model(model_name, hparams=None):
         do_pooling = getattr(hparams, 'do_pooling', [True, True, False])
         hidden_size = getattr(hparams, 'hidden_size', 1024)
 
+        # Auto-scale pooling sizes when using defaults that don't match num_rois
+        if pooling_sizes == [100, 50, 25]:
+            pooling_sizes = [num_rois // 2, num_rois // 10]
+            do_pooling = [True, True]
+
         if hparams.downstream_task_type == 'regression':
             net = BNTRegression(
                 num_rois=num_rois,

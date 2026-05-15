@@ -3,16 +3,16 @@
 # based models (BNT, BrainGNN, LG-GNN, Com-BrainTF, IBGNN, BrainNetCNN).
 #
 # This produces:
-#   <image_path>/roi/<atlas>/                # per-subject ROI time series
-#   <image_path>/fc/<atlas>/<fc_type>/       # FC matrices
+#   <output_dir>/roi/<atlas>/                # per-subject ROI time series
+#   <output_dir>/fc/<atlas>/<fc_type>/       # FC matrices
 #
 # Usage:
-#   bash scripts/preprocess_fc.sh <dataset> [atlas] [fc_types...]
+#   bash scripts/preprocess_fc.sh <dataset> [--format blob|nii] [--atlas ATLAS] [--fc_types TYPE...]
 #
 # Examples:
 #   bash scripts/preprocess_fc.sh hcp1200
-#   bash scripts/preprocess_fc.sh hcp1200 cc200 correlation partial_correlation
-#   bash scripts/preprocess_fc.sh adhd200 aal correlation
+#   bash scripts/preprocess_fc.sh hcp1200 --format blob --atlas cc200
+#   bash scripts/preprocess_fc.sh adhd200 --format nii --atlas aal3 --fc_types correlation
 
 set -euo pipefail
 
@@ -21,21 +21,25 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CONFIG_DIR="${SCRIPT_DIR}/configs/datasets"
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: bash scripts/preprocess_fc.sh <dataset> [atlas] [fc_types...]"
+    echo "Usage: bash scripts/preprocess_fc.sh <dataset> [--format blob|nii] [--atlas ATLAS] [--fc_types TYPE...]"
     echo "Available datasets:"
     ls "${CONFIG_DIR}" 2>/dev/null | sed 's/.yaml$//'
     exit 1
 fi
 
-DATASET="$1"
-ATLAS="${2:-cc200}"
-shift 1 || true
-if [[ $# -gt 1 ]]; then
-    shift 1
-    FC_TYPES=("$@")
-else
-    FC_TYPES=(correlation partial_correlation)
-fi
+DATASET="$1"; shift
+FORMAT="blob"
+ATLAS="cc200"
+FC_TYPES=(correlation partial_correlation)
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --format)  FORMAT="$2"; shift 2 ;;
+        --atlas)   ATLAS="$2"; shift 2 ;;
+        --fc_types) shift; FC_TYPES=(); while [[ $# -gt 0 && ! "$1" == --* ]]; do FC_TYPES+=("$1"); shift; done ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+done
 
 DATASET_CONFIG="${CONFIG_DIR}/${DATASET}.yaml"
 if [[ ! -f "${DATASET_CONFIG}" ]]; then
@@ -43,49 +47,35 @@ if [[ ! -f "${DATASET_CONFIG}" ]]; then
     exit 1
 fi
 
-# Pull image_path / dataset_name out of the yaml (no external parser dependency).
 yaml_get() {
     grep -E "^[[:space:]]*$2:" "$1" 2>/dev/null | head -1 \
         | sed 's/^[^:]*:[[:space:]]*//' | sed 's/^"\(.*\)"$/\1/' | sed 's/[[:space:]]*$//'
 }
 
-DATASET_NAME="$(yaml_get "${DATASET_CONFIG}" dataset_name)"
 IMAGE_PATH="$(yaml_get "${DATASET_CONFIG}" image_path)"
 if [[ -z "${IMAGE_PATH}" ]]; then
     echo "Error: image_path missing in ${DATASET_CONFIG}"
     exit 1
 fi
 
-NUM_PROCESSES="${NUM_PROCESSES:-8}"
+NUM_PROCESSES="${NUM_PROCESSES:-4}"
 
 echo "=============================================="
 echo " FC / graph preprocessing"
 echo "=============================================="
-echo " Dataset:     ${DATASET_NAME}"
+echo " Dataset:     ${DATASET}"
 echo " Image path:  ${IMAGE_PATH}"
+echo " Format:      ${FORMAT}"
 echo " Atlas:       ${ATLAS}"
 echo " FC types:    ${FC_TYPES[*]}"
 echo " Processes:   ${NUM_PROCESSES}"
 echo "=============================================="
 
-# Step 1: ROI time series from raw fMRI nii files.
-# Expects <IMAGE_PATH>/img/<dataset_name>/<subject>/*.nii.gz layout (see the
-# generate_roi_data_from_nii.py docstring for details).
-echo "Step 1: ROI time series -> ${IMAGE_PATH}/roi/${ATLAS}"
-python "${ROOT_DIR}/datasets/generate_roi_data_from_nii.py" \
+python "${ROOT_DIR}/datasets/compute_roi_fc.py" \
+    --input_dir "${IMAGE_PATH}/img" \
+    --input_format "${FORMAT}" \
+    --output_dir "${IMAGE_PATH}" \
     --atlas_names "${ATLAS}" \
-    --dataset_names "${DATASET_NAME}" \
-    --fmri_dir "${IMAGE_PATH}/img" \
-    --atlas_dir "${ROOT_DIR}/datasets/atlas" \
-    --output_dir "${IMAGE_PATH}/roi/${ATLAS}" \
-    --num_processes "${NUM_PROCESSES}"
-
-# Step 2: FC matrices.
-echo "Step 2: FC matrices -> ${IMAGE_PATH}/fc/${ATLAS}"
-python "${ROOT_DIR}/datasets/compute_fc.py" \
-    --roi_dir "${IMAGE_PATH}/roi/${ATLAS}" \
-    --output_dir "${IMAGE_PATH}/fc/${ATLAS}" \
-    --atlas_name "${ATLAS}" \
     --fc_types "${FC_TYPES[@]}" \
     --num_processes "${NUM_PROCESSES}"
 

@@ -61,7 +61,7 @@ if torch.cuda.is_available():
     torch.set_float32_matmul_precision("high")
 
 import neptune
-from utils.data_module import fMRIDataModule
+from datasets.data_module import fMRIDataModule
 from utils.parser import str2bool
 from models.lightning_model import LightningModel
 from huggingface_hub import hf_hub_download

@@ -39,3 +39,4 @@ dlc_run.sh
 datasets/save_frames.py
 datasets/hcp_task_2448996.csv
 scripts/dataset_download/hcp_t1t2
+nas

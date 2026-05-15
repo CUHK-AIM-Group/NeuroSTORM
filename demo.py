@@ -30,7 +30,7 @@ import numpy as np
 import pytorch_lightning as pl
 
 from models.lightning_model import LightningModel
-from utils.data_module import fMRIDataModule
+from datasets.data_module import fMRIDataModule
 from utils.parser import str2bool
 from datasets.fmri_datasets import pad_to_96, resize_volume
 

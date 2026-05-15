@@ -13,7 +13,6 @@ import torch.nn.functional as F
 from torch.nn import Parameter, Linear, Sequential, ReLU, BatchNorm1d
 from torch_geometric.nn import MessagePassing, TopKPooling, global_mean_pool, global_max_pool
 from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
-from torch_sparse import spspmm
 
 
 class BrainGraphConv(MessagePassing):
@@ -199,19 +198,15 @@ class BrainGNN(nn.Module):
         x = self.fc3(x)
 
         # Return logits (not log_softmax) for compatibility with CrossEntropyLoss
-        return x, self.pool1.weight, self.pool2.weight, torch.sigmoid(score1), torch.sigmoid(score2)
+        return x, self.pool1.select.weight, self.pool2.select.weight, torch.sigmoid(score1), torch.sigmoid(score2)
 
     def augment_adj(self, edge_index, edge_attr, num_nodes):
         """
-        Augment adjacency matrix by computing A^2 (second-order connections).
-        This helps capture indirect relationships between brain regions.
+        Augment adjacency matrix. For full graphs, simply add and remove
+        self-loops to normalize the structure (avoids torch_sparse dependency).
         """
         edge_index, edge_attr = add_self_loops(
             edge_index, edge_attr, fill_value=1.0, num_nodes=num_nodes
-        )
-        edge_index, edge_attr = spspmm(
-            edge_index, edge_attr, edge_index, edge_attr,
-            num_nodes, num_nodes, num_nodes
         )
         edge_index, edge_attr = remove_self_loops(edge_index, edge_attr)
         return edge_index, edge_attr
