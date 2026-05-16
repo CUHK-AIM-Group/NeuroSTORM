@@ -58,9 +58,10 @@ def resize_volume(y, target_size):
 
 
 class BaseDataset(Dataset):
-    # Upper bound on per-worker mmap'd blobs held open at once.
-    # Bounds FD usage for very large datasets (e.g. UKB ~40k subjects).
-    _blob_cache_max = 256
+    # Upper bound on per-worker int8 blobs held in RAM at once.
+    # Each blob is ~hundreds of MB; keep this small so 16 workers don't
+    # blow up host memory (cache_max * num_workers * blob_size).
+    _blob_cache_max = 8
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -100,13 +101,28 @@ class BaseDataset(Dataset):
         return fmt
 
     def _get_blob(self, subject_path):
-        """Lazily mmap a subject's data.pt; LRU-evict older entries."""
+        """Lazily load a subject's data.pt; LRU-evict older entries.
+
+        mmap=True is the default and cheap, but some sshfs/NFS backends deny
+        PROT_READ mappings (torch.load surfaces this as `Operation not permitted`).
+        On that error we fall back to a plain read for that subject. Set
+        NEUROSTORM_BLOB_MMAP=0 to skip the mmap attempt entirely.
+        """
         blob = self._data_blobs.get(subject_path)
         if blob is not None:
             self._data_blobs.move_to_end(subject_path)
             return blob
         blob_path = os.path.join(subject_path, 'data.pt')
-        blob = torch.load(blob_path, mmap=True, weights_only=True)
+        prefer_mmap = os.environ.get("NEUROSTORM_BLOB_MMAP", "1") != "0"
+        if prefer_mmap:
+            try:
+                blob = torch.load(blob_path, mmap=True, weights_only=True)
+            except RuntimeError as e:
+                if "Operation not permitted" not in str(e):
+                    raise
+                blob = torch.load(blob_path, mmap=False, weights_only=True)
+        else:
+            blob = torch.load(blob_path, mmap=False, weights_only=True)
         self._data_blobs[subject_path] = blob
         while len(self._data_blobs) > self._blob_cache_max:
             self._data_blobs.popitem(last=False)
@@ -117,9 +133,14 @@ class BaseDataset(Dataset):
         if cached is not None:
             return cached
         if self._detect_format(subject_path) == 'blob':
-            # peek metadata without caching the mmap (avoids FD exhaustion at setup)
-            peek = torch.load(os.path.join(subject_path, 'data.pt'),
-                              mmap=True, weights_only=True)
+            # peek metadata cheaply via mmap; fall back if the FS denies it
+            peek_path = os.path.join(subject_path, 'data.pt')
+            try:
+                peek = torch.load(peek_path, mmap=True, weights_only=True)
+            except RuntimeError as e:
+                if "Operation not permitted" not in str(e):
+                    raise
+                peek = torch.load(peek_path, mmap=False, weights_only=True)
             n = int(peek['num_frames'])
             del peek
         else:

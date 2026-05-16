@@ -772,14 +772,17 @@ class fMRIDataModule(pl.LightningDataModule):
 
         # DistributedSampler is internally called in pl.Trainer
         def get_params(train):
-            return {
+            params = {
                 "batch_size": self.hparams.batch_size if train else self.hparams.eval_batch_size,
                 "num_workers": self.hparams.num_workers,
                 "drop_last": True,
-                "pin_memory": False,
-                "persistent_workers": (train and (self.hparams.strategy == 'ddp')),
-                "shuffle": train
+                "pin_memory": bool(self.hparams.pin_memory),
+                "persistent_workers": (self.hparams.num_workers > 0) and (train and (self.hparams.strategy == 'ddp')),
+                "shuffle": train,
             }
+            if self.hparams.num_workers > 0 and self.hparams.prefetch_factor is not None:
+                params["prefetch_factor"] = int(self.hparams.prefetch_factor)
+            return params
 
         # Use GeometricDataLoader for graph datasets
         if data_type == 'fc_graph':
@@ -821,6 +824,10 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--stride_between_seq", type=int, default=1, help="skip some fMRI volumes between fMRI sub-sequences")
         group.add_argument("--stride_within_seq", type=int, default=1, help="skip some fMRI volumes within fMRI sub-sequences")
         group.add_argument("--num_workers", type=int, default=8)
+        group.add_argument("--prefetch_factor", type=int, default=None,
+                          help="DataLoader prefetch_factor (per-worker prefetched batches). Requires num_workers > 0.")
+        group.add_argument("--pin_memory", type=str2bool, default=False,
+                          help="Pin host memory in DataLoaders (faster H2D copy when training on GPU).")
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")

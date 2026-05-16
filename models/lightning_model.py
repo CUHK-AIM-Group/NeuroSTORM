@@ -316,7 +316,7 @@ class LightningModel(pl.LightningModule):
                     f"{mode}_l1_loss": l1
                 }
         
-        self.log_dict(result_dict, prog_bar=True, sync_dist=False, add_dataloader_idx=False, on_step=True, on_epoch=False, batch_size=self.hparams.batch_size)
+        self.log_dict(result_dict, prog_bar=True, sync_dist=False, add_dataloader_idx=False, on_step=(mode == 'train'), on_epoch=(mode != 'train'), batch_size=self.hparams.batch_size)
         
         return loss
 

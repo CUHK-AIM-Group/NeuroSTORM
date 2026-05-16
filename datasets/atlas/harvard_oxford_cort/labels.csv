@@ -1,0 +1,50 @@
+index,name
+1,Background
+2,Frontal Pole
+3,Insular Cortex
+4,Superior Frontal Gyrus
+5,Middle Frontal Gyrus
+6,"Inferior Frontal Gyrus, pars triangularis"
+7,"Inferior Frontal Gyrus, pars opercularis"
+8,Precentral Gyrus
+9,Temporal Pole
+10,"Superior Temporal Gyrus, anterior division"
+11,"Superior Temporal Gyrus, posterior division"
+12,"Middle Temporal Gyrus, anterior division"
+13,"Middle Temporal Gyrus, posterior division"
+14,"Middle Temporal Gyrus, temporooccipital part"
+15,"Inferior Temporal Gyrus, anterior division"
+16,"Inferior Temporal Gyrus, posterior division"
+17,"Inferior Temporal Gyrus, temporooccipital part"
+18,Postcentral Gyrus
+19,Superior Parietal Lobule
+20,"Supramarginal Gyrus, anterior division"
+21,"Supramarginal Gyrus, posterior division"
+22,Angular Gyrus
+23,"Lateral Occipital Cortex, superior division"
+24,"Lateral Occipital Cortex, inferior division"
+25,Intracalcarine Cortex
+26,Frontal Medial Cortex
+27,Juxtapositional Lobule Cortex (formerly Supplementary Motor Cortex)
+28,Subcallosal Cortex
+29,Paracingulate Gyrus
+30,"Cingulate Gyrus, anterior division"
+31,"Cingulate Gyrus, posterior division"
+32,Precuneous Cortex
+33,Cuneal Cortex
+34,Frontal Orbital Cortex
+35,"Parahippocampal Gyrus, anterior division"
+36,"Parahippocampal Gyrus, posterior division"
+37,Lingual Gyrus
+38,"Temporal Fusiform Cortex, anterior division"
+39,"Temporal Fusiform Cortex, posterior division"
+40,Temporal Occipital Fusiform Cortex
+41,Occipital Fusiform Gyrus
+42,Frontal Opercular Cortex
+43,Central Opercular Cortex
+44,Parietal Opercular Cortex
+45,Planum Polare
+46,Heschl's Gyrus (includes H1 and H2)
+47,Planum Temporale
+48,Supracalcarine Cortex
+49,Occipital Pole

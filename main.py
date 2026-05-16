@@ -185,6 +185,7 @@ def cli_main():
             filename="checkpt-{epoch:02d}-{valid_loss:.2f}",
             save_last=True,
             mode="min",
+            save_on_train_epoch_end=False,
         )
     # callback for classification task
     elif args.downstream_task_type == "classification":
@@ -195,6 +196,7 @@ def cli_main():
                 filename="checkpt-{epoch:02d}-{valid_reid_top1:.4f}",
                 save_last=True,
                 mode="max",
+                save_on_train_epoch_end=False,
             )
         else:
             checkpoint_callback = ModelCheckpoint(
@@ -203,6 +205,7 @@ def cli_main():
                 filename="checkpt-{epoch:02d}-{valid_acc:.2f}",
                 save_last=True,
                 mode="max",
+                save_on_train_epoch_end=False,
             )
     # callback for regression task
     else:
@@ -212,6 +215,7 @@ def cli_main():
             filename="checkpt-{epoch:02d}-{valid_mse:.2f}",
             save_last=True,
             mode="min",
+            save_on_train_epoch_end=False,
         )
 
     lr_monitor = LearningRateMonitor(logging_interval="step")
