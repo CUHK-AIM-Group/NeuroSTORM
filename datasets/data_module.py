@@ -2,12 +2,166 @@ import os
 import pytorch_lightning as pl
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader, Subset, ConcatDataset
+import torch
+from torch.utils.data import DataLoader, Subset, ConcatDataset, Sampler
 from torch_geometric.data import DataLoader as GeometricDataLoader
 from .fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag
 from .roi_datasets import ROIDataset, FCDataset, FCGraphDataset
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from utils.parser import str2bool
+
+
+# =============================================================================
+# Multi-dataset sampling strategies for pretraining
+# =============================================================================
+
+class MultiDatasetSampler(Sampler):
+    """Base class for multi-dataset sampling strategies.
+
+    Subclasses implement `_compute_indices()` which returns the list of global
+    indices (into the ConcatDataset) to use for the current epoch.
+    """
+
+    def __init__(self, concat_dataset, seed=0):
+        self.concat_dataset = concat_dataset
+        self.cumulative_sizes = concat_dataset.cumulative_sizes
+        self.num_datasets = len(self.cumulative_sizes)
+        self.seed = seed
+        self.epoch = 0
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def _dataset_ranges(self):
+        """Return list of (start, end) index ranges for each sub-dataset."""
+        ranges = []
+        prev = 0
+        for end in self.cumulative_sizes:
+            ranges.append((prev, end))
+            prev = end
+        return ranges
+
+    def _compute_indices(self):
+        raise NotImplementedError
+
+    def __iter__(self):
+        indices = self._compute_indices()
+        return iter(indices)
+
+    def __len__(self):
+        return len(self._compute_indices())
+
+
+class UniformSubsampleStrategy(MultiDatasetSampler):
+    """Strategy 1: Uniform subsampling.
+
+    Each epoch, randomly sample at most `max_samples` from each sub-dataset.
+    All datasets contribute equally (capped), preventing large datasets from
+    dominating. Different random subset each epoch.
+    """
+
+    def __init__(self, concat_dataset, max_samples_per_dataset=500, seed=0):
+        super().__init__(concat_dataset, seed=seed)
+        self.max_samples = max_samples_per_dataset
+
+    def _compute_indices(self):
+        rng = np.random.RandomState(self.seed + self.epoch)
+        indices = []
+        for start, end in self._dataset_ranges():
+            size = end - start
+            n = min(size, self.max_samples)
+            chosen = rng.choice(size, n, replace=False) + start
+            indices.extend(chosen.tolist())
+        rng.shuffle(indices)
+        return indices
+
+    def __len__(self):
+        total = 0
+        for start, end in self._dataset_ranges():
+            total += min(end - start, self.max_samples)
+        return total
+
+
+class LossWeightedStrategy(MultiDatasetSampler):
+    """Strategy 2: Loss-weighted resampling.
+
+    Each epoch, the number of samples drawn from each dataset is proportional
+    to its average loss from the previous epoch. Datasets with higher loss get
+    more samples, preventing training from being dominated by easy/large
+    datasets. Falls back to uniform sampling on the first epoch.
+
+    Call `update_losses(per_dataset_losses)` at the end of each epoch with a
+    list of average losses (one per sub-dataset).
+    """
+
+    def __init__(self, concat_dataset, total_samples_per_epoch=2500, seed=0):
+        super().__init__(concat_dataset, seed=seed)
+        self.total_samples = total_samples_per_epoch
+        self._per_dataset_weights = np.ones(self.num_datasets) / self.num_datasets
+
+    def update_losses(self, per_dataset_losses):
+        """Update sampling weights based on per-dataset average losses.
+
+        Args:
+            per_dataset_losses: list/array of length num_datasets, each entry
+                is the mean training loss for that dataset in the last epoch.
+        """
+        losses = np.array(per_dataset_losses, dtype=np.float64)
+        losses = np.clip(losses, 1e-8, None)
+        self._per_dataset_weights = losses / losses.sum()
+
+    def _compute_indices(self):
+        rng = np.random.RandomState(self.seed + self.epoch)
+        indices = []
+        ranges = self._dataset_ranges()
+        per_dataset_n = (self._per_dataset_weights * self.total_samples).astype(int)
+        remainder = self.total_samples - per_dataset_n.sum()
+        top_k = np.argsort(-self._per_dataset_weights)[:remainder]
+        per_dataset_n[top_k] += 1
+
+        for i, (start, end) in enumerate(ranges):
+            size = end - start
+            n = min(int(per_dataset_n[i]), size)
+            chosen = rng.choice(size, n, replace=False) + start
+            indices.extend(chosen.tolist())
+        rng.shuffle(indices)
+        return indices
+
+    def __len__(self):
+        return self.total_samples
+
+
+# --- Add new strategies here ---
+# class YourNewStrategy(MultiDatasetSampler):
+#     """Strategy N: Description."""
+#     def __init__(self, concat_dataset, ...):
+#         super().__init__(concat_dataset, seed=seed)
+#         ...
+#     def _compute_indices(self):
+#         ...
+
+
+SAMPLING_STRATEGIES = {
+    "uniform_subsample": UniformSubsampleStrategy,
+    "loss_weighted": LossWeightedStrategy,
+    # Register new strategies here
+}
+
+
+def build_multi_dataset_sampler(strategy_name, concat_dataset, hparams):
+    """Factory function to build a multi-dataset sampler from hparams."""
+    seed = getattr(hparams, 'seed', 0)
+    if strategy_name == "uniform_subsample":
+        max_samples = getattr(hparams, 'max_samples_per_dataset', 500)
+        return UniformSubsampleStrategy(concat_dataset, max_samples_per_dataset=max_samples, seed=seed)
+    elif strategy_name == "loss_weighted":
+        num_datasets = len(concat_dataset.cumulative_sizes)
+        max_samples = getattr(hparams, 'max_samples_per_dataset', 500)
+        total = max_samples * num_datasets
+        return LossWeightedStrategy(concat_dataset, total_samples_per_epoch=total, seed=seed)
+    else:
+        raise ValueError(f"Unknown sampling strategy: {strategy_name}. "
+                         f"Available: {list(SAMPLING_STRATEGIES.keys())}")
 
 
 def _rank0_print(*args, **kwargs):
@@ -784,17 +938,39 @@ class fMRIDataModule(pl.LightningDataModule):
                 params["prefetch_factor"] = int(self.hparams.prefetch_factor)
             return params
 
+        # Per-dataset sampling strategy for pretraining with multiple datasets
+        self._train_sampler = None
+        use_strategy = (
+            self.hparams.pretraining
+            and isinstance(self.train_dataset, ConcatDataset)
+            and getattr(self.hparams, 'sampling_strategy', None) is not None
+        )
+
         # Use GeometricDataLoader for graph datasets
         if data_type == 'fc_graph':
             self.train_loader = GeometricDataLoader(self.train_dataset, **get_params(train=True))
             self.val_loader = GeometricDataLoader(self.val_dataset, **get_params(train=False))
             self.test_loader = GeometricDataLoader(self.test_dataset, **get_params(train=False))
+        elif use_strategy:
+            self._train_sampler = build_multi_dataset_sampler(
+                self.hparams.sampling_strategy,
+                self.train_dataset,
+                self.hparams,
+            )
+            train_params = get_params(train=True)
+            train_params["shuffle"] = False
+            train_params["sampler"] = self._train_sampler
+            self.train_loader = DataLoader(self.train_dataset, **train_params)
+            self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
+            self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
         else:
             self.train_loader = DataLoader(self.train_dataset, **get_params(train=True))
             self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
             self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
 
     def train_dataloader(self):
+        if self._train_sampler is not None:
+            self._train_sampler.set_epoch(self.trainer.current_epoch)
         return self.train_loader
 
     def val_dataloader(self):
@@ -831,6 +1007,15 @@ class fMRIDataModule(pl.LightningDataModule):
         group.add_argument("--with_voxel_norm", type=str2bool, default=False)
         group.add_argument("--shuffle_time_sequence", action='store_true')
         group.add_argument("--limit_training_samples", type=float, default=None, help="use if you want to limit training samples")
+
+        # Multi-dataset sampling strategy (pretraining only)
+        group.add_argument("--sampling_strategy", type=str, default=None,
+                          choices=list(SAMPLING_STRATEGIES.keys()),
+                          help="Multi-dataset sampling strategy for pretraining. "
+                               "'uniform_subsample': cap each dataset to --max_samples_per_dataset per epoch. "
+                               "'loss_weighted': resample proportional to per-dataset loss.")
+        group.add_argument("--max_samples_per_dataset", type=int, default=500,
+                          help="Max samples per dataset per epoch (used by uniform_subsample and as base for loss_weighted)")
 
         # New arguments for ROI/FC data
         group.add_argument("--data_type", type=str, default="voxel", choices=["voxel", "roi", "fc", "fc_graph", "fc_bnt"],

@@ -128,18 +128,39 @@ class BaseDataset(Dataset):
             self._data_blobs.popitem(last=False)
         return blob
 
+    _frame_counts_json_cache = {}
+
+    @classmethod
+    def _load_frame_counts_json(cls, dataset_root):
+        if dataset_root not in cls._frame_counts_json_cache:
+            json_path = os.path.join(dataset_root, 'frame_counts.json')
+            if os.path.isfile(json_path):
+                import json
+                with open(json_path) as f:
+                    cls._frame_counts_json_cache[dataset_root] = json.load(f)
+            else:
+                cls._frame_counts_json_cache[dataset_root] = None
+        return cls._frame_counts_json_cache[dataset_root]
+
     def _count_frames(self, subject_path):
         cached = self._num_frames_cache.get(subject_path)
         if cached is not None:
             return cached
+        dataset_root = os.path.dirname(os.path.dirname(subject_path))
+        fc_json = self._load_frame_counts_json(dataset_root)
+        if fc_json is not None:
+            subj_name = os.path.basename(subject_path)
+            n = fc_json.get(subj_name, 0)
+            self._num_frames_cache[subject_path] = n
+            return n
         if self._detect_format(subject_path) == 'blob':
-            # peek metadata cheaply via mmap; fall back if the FS denies it
             peek_path = os.path.join(subject_path, 'data.pt')
             try:
                 peek = torch.load(peek_path, mmap=True, weights_only=True)
             except RuntimeError as e:
                 if "Operation not permitted" not in str(e):
-                    raise
+                    self._num_frames_cache[subject_path] = 0
+                    return 0
                 peek = torch.load(peek_path, mmap=False, weights_only=True)
             n = int(peek['num_frames'])
             del peek

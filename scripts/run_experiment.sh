@@ -125,6 +125,8 @@ NUM_WORKERS=""
 MAX_EPOCHS=""
 STRATEGY="ddp"
 LOAD_MODEL_PATH=""
+SAMPLING_STRATEGY=""
+MAX_SAMPLES_PER_DATASET=""
 DRY_RUN=false
 
 print_usage() {
@@ -151,6 +153,8 @@ Options:
   --seed <n>              Random seed (default: 1)
   --strategy <s>          Training strategy (default: ddp)
   --load_model_path <p>   Path to checkpoint. For pretrain: resume training. For finetune: load pretrained weights.
+  --sampling_strategy <s> Multi-dataset sampling: uniform_subsample or loss_weighted (pretrain only)
+  --max_samples_per_dataset <n>  Max samples per dataset per epoch (default: 500, pretrain only)
   --dry_run               Print command without executing
   -- <extra_args>         Pass additional arguments to main.py
 
@@ -189,6 +193,8 @@ while [[ $# -gt 0 ]]; do
         --strategy)    STRATEGY="$2"; shift 2 ;;
         --task_name)   TASK_NAME_OVERRIDE="$2"; shift 2 ;;
         --load_model_path) LOAD_MODEL_PATH="$2"; shift 2 ;;
+        --sampling_strategy) SAMPLING_STRATEGY="$2"; shift 2 ;;
+        --max_samples_per_dataset) MAX_SAMPLES_PER_DATASET="$2"; shift 2 ;;
         --dry_run)     DRY_RUN=true; shift ;;
         --help|-h)     print_usage; exit 0 ;;
         --)            shift; EXTRA_ARGS="$*"; break ;;
@@ -336,6 +342,7 @@ final_dataset_split_num="$cfg_dataset_split_num"
 model_embed_dim=$(yaml_get_model_arg "$MODEL_CONFIG" "embed_dim")
 model_depth=$(yaml_get_model_arg "$MODEL_CONFIG" "depth")
 model_depths=$(yaml_get_model_arg "$MODEL_CONFIG" "depths")
+model_num_heads=$(yaml_get_model_arg "$MODEL_CONFIG" "num_heads")
 model_seq_len=$(yaml_get_model_arg "$MODEL_CONFIG" "sequence_length")
 model_img_size=$(yaml_get_model_arg "$MODEL_CONFIG" "img_size")
 model_first_window=$(yaml_get_model_arg "$MODEL_CONFIG" "first_window_size")
@@ -426,7 +433,10 @@ if [[ "$cfg_data_type" == "voxel" ]]; then
     fi
     depth_val="${model_depth:-$model_depths}"
     if [[ -n "$depth_val" ]]; then
-        CMD+=" --depth $(list_to_args "$depth_val")"
+        CMD+=" --depths $(list_to_args "$depth_val")"
+    fi
+    if [[ -n "$model_num_heads" ]]; then
+        CMD+=" --num_heads $(list_to_args "$model_num_heads")"
     fi
     if [[ -n "$model_seq_len" ]]; then
         CMD+=" --sequence_length $model_seq_len"
@@ -561,6 +571,12 @@ case "$MODE" in
         fi
         if [[ -n "$LOAD_MODEL_PATH" ]]; then
             CMD+=" --load_model_path $LOAD_MODEL_PATH"
+        fi
+        if [[ -n "$SAMPLING_STRATEGY" ]]; then
+            CMD+=" --sampling_strategy $SAMPLING_STRATEGY"
+        fi
+        if [[ -n "$MAX_SAMPLES_PER_DATASET" ]]; then
+            CMD+=" --max_samples_per_dataset $MAX_SAMPLES_PER_DATASET"
         fi
         CMD+=" --auto_resume"
         ;;

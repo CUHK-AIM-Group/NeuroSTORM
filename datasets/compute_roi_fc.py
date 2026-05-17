@@ -47,39 +47,24 @@ def resize_atlas_labels(atlas_labels, target_shape):
 
 
 def load_atlas(atlas_name, target_shape=None, voxel_size=None):
-    """Load atlas, selecting resolution based on voxel_size if available.
+    """Load atlas from datasets/atlas/<atlas_name>/atlas.nii.gz.
 
-    Resolution selection: if voxel_size is provided, picks the atlas file
-    whose resolution best matches (e.g., 2mm atlas for 2mm data).
-    Falls back to resize_atlas_labels if no exact spatial match.
+    Falls back to legacy flat file layout (atlas_name.nii.gz) if the
+    directory-based layout is not found.
     """
-    candidates = []
-    for suffix in ['_1mm', '_2mm', '']:
-        p = os.path.join(ATLAS_DIR, f'{atlas_name}{suffix}.nii.gz')
-        if os.path.exists(p):
-            candidates.append(p)
-
-    if not candidates:
-        raise FileNotFoundError(f'Atlas not found: {atlas_name} in {ATLAS_DIR}')
-
-    if voxel_size is not None and len(candidates) > 1:
-        avg_voxel = np.mean(voxel_size[:3])
-        best_path = None
-        best_diff = float('inf')
-        for p in candidates:
-            if '_1mm' in p:
-                diff = abs(avg_voxel - 1.0)
-            elif '_2mm' in p:
-                diff = abs(avg_voxel - 2.0)
-            else:
-                img = nib.load(p)
-                atlas_voxel = np.mean(img.header.get_zooms()[:3])
-                diff = abs(avg_voxel - atlas_voxel)
-            if diff < best_diff:
-                best_diff = diff
-                best_path = p
-        atlas_path = best_path
+    # New layout: atlas_name/atlas.nii.gz
+    dir_path = os.path.join(ATLAS_DIR, atlas_name, 'atlas.nii.gz')
+    if os.path.exists(dir_path):
+        atlas_path = dir_path
     else:
+        # Legacy flat layout
+        candidates = []
+        for suffix in ['_1mm', '_2mm', '']:
+            p = os.path.join(ATLAS_DIR, f'{atlas_name}{suffix}.nii.gz')
+            if os.path.exists(p):
+                candidates.append(p)
+        if not candidates:
+            raise FileNotFoundError(f'Atlas not found: {atlas_name} in {ATLAS_DIR}')
         atlas_path = candidates[0]
 
     atlas_data = nib.load(atlas_path).get_fdata().astype(np.int32)
@@ -121,7 +106,7 @@ def extract_roi_from_volume(volume_4d, atlas_labels):
 def load_blob(subject_path):
     """Load data.pt blob and return float32 [T, H, W, D]."""
     blob = torch.load(os.path.join(subject_path, 'data.pt'),
-                      mmap=True, weights_only=True)
+                      mmap=True, weights_only=False)
     frames = blob['frames'].to(torch.float32) * float(blob['scale'])
     return frames.numpy()  # [T, H, W, D]
 

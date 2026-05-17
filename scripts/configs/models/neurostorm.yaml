@@ -7,7 +7,8 @@ batch_size: 8
 
 model_args:
   embed_dim: 36
-  depth: [2, 2, 6, 2]
+  depths: [2, 2, 6, 2]
+  num_heads: [3, 6, 12, 24]
   c_multiplier: 2
   last_layer_full_MSA: true
   clf_head_version: v1

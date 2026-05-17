@@ -1356,7 +1356,7 @@ class NeuroSTORMMAE(nn.Module):
             sequence = sequence.clone()
             sequence[overall_mask_flat] = atlas_mask_token
             overall_mask = rearrange(overall_mask, 'B N -> B N')
-            new_sequence = rearrange(sequence, '(B N) C -> B C D H W T', B=B, C=C, D=D, H=H, W=W, T=T)
+            new_sequence = rearrange(sequence, '(B D H W T) C -> B C D H W T', B=B, D=D, H=H, W=W, T=T)
 
         elif self.spatial_mask == 'window' and self.time_mask == 'random':
             # Window-level masking: partition into windows, then randomly mask entire windows
@@ -1393,7 +1393,7 @@ class NeuroSTORMMAE(nn.Module):
             B, D, H, W, T, C = sequence.shape
             dims = (B, D, H, W, T)
             windows = window_partition_with_b(sequence, self.tube_window_size)
-            B, N, window_volume, D = windows.shape
+            B, N, window_volume, _ = windows.shape
 
             overall_mask = np.zeros([B, N])
             for i in range(B):
@@ -1406,12 +1406,12 @@ class NeuroSTORMMAE(nn.Module):
                 np.random.shuffle(mask)
                 overall_mask[i, :] = mask
 
-            overall_mask = torch.from_numpy(overall_mask).to(torch.bool)
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(windows.device)
             windows = rearrange(windows, 'B N W C -> (B N) W C')
-            overall_mask = rearrange(overall_mask, 'B N -> (B N)')
-            windows[overall_mask] = self.window_mask_token
-            overall_mask = rearrange(overall_mask, '(B N) -> B N', B=B)
-            overall_mask = overall_mask.cuda()
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            mask_token = self.mask_token.to(windows.device, windows.dtype)
+            windows = windows.clone()
+            windows[overall_mask_flat] = mask_token
             new_sequence = window_reverse(windows, self.tube_window_size, dims)
             new_sequence = rearrange(new_sequence, 'B D H W T C -> B C D H W T')
 
@@ -1445,12 +1445,36 @@ class NeuroSTORMMAE(nn.Module):
             sequence = sequence.clone()
             sequence[overall_mask_flat] = atlas_mask_token
             overall_mask = rearrange(overall_mask, 'B N -> B N')
-            new_sequence = rearrange(sequence, '(B N) C -> B C D H W T', B=B, C=C, D=D, H=H, W=W, T=T)
+            new_sequence = rearrange(sequence, '(B D H W T) C -> B C D H W T', B=B, D=D, H=H, W=W, T=T)
 
         elif self.spatial_mask == 'window' and self.time_mask == 'tube':
-            # Window-level spatial masking + tube temporal masking
-            # TODO: Implement window-tube combined masking
-            raise NotImplementedError("Window-tube combined masking is not yet implemented")
+            # Spatial window + tube along time: mask 3D spatial windows for ALL time steps.
+            sequence = rearrange(sequence, 'B C D H W T -> B D H W T C')
+            B, D, H, W, T, C = sequence.shape
+            dims = (B, D, H, W, T)
+            win_size = [self.window_size[0], self.window_size[1], self.window_size[2], T]
+            windows = window_partition_with_b(sequence, win_size)
+            B, N, window_volume, _ = windows.shape
+
+            overall_mask = np.zeros([B, N])
+            for i in range(B):
+                num_mask = int(N * self.mask_ratio)
+                num_unmask = N - num_mask
+                mask = np.hstack([
+                    np.zeros(num_unmask),
+                    np.ones(num_mask),
+                ])
+                np.random.shuffle(mask)
+                overall_mask[i, :] = mask
+
+            overall_mask = torch.from_numpy(overall_mask).to(torch.bool).to(windows.device)
+            windows = rearrange(windows, 'B N W C -> (B N) W C')
+            overall_mask_flat = rearrange(overall_mask, 'B N -> (B N)')
+            mask_token = self.mask_token.to(windows.device, windows.dtype)
+            windows = windows.clone()
+            windows[overall_mask_flat] = mask_token
+            new_sequence = window_reverse(windows, win_size, dims)
+            new_sequence = rearrange(new_sequence, 'B D H W T C -> B C D H W T')
 
         else:
             raise ValueError(f"Invalid mask type: spatial_mask={self.spatial_mask}, time_mask={self.time_mask}")

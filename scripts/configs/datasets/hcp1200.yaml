@@ -1,5 +1,5 @@
 dataset_name: HCP1200
-image_path: /data/cwang/remote/fmri/HCP1200_MNI_to_TRs_minmax
+image_path: /data/cwang/remote/fmri/hcpya_preprocessed
 image_path_fc: /data/cwang/remote/fmri/hcpya_preprocessed
 
 tasks:
