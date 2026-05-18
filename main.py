@@ -221,6 +221,9 @@ def cli_main():
     lr_monitor = LearningRateMonitor(logging_interval="step")
     callbacks = [checkpoint_callback, lr_monitor]
 
+    from utils._step_timer import maybe_attach as _maybe_attach_step_timer
+    _maybe_attach_step_timer(callbacks)
+
     # ------------ trainer -------------
     # Determine accelerator and devices
     if torch.cuda.is_available() and num_gpus > 0:

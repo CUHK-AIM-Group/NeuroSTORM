@@ -1,6 +1,6 @@
 dataset_name: ABCD
-image_path: /data/cwang/remote/fmri/abcd_preprocessed
-image_path_fc: /data/cwang/remote/fmri/abcd_preprocessed
+image_path: /data_ssd/cwang/fmri/abcd_preprocessed
+image_path_fc: /data_ssd/cwang/fmri/abcd_preprocessed
 
 pretrain_only: true
 

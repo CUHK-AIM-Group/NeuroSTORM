@@ -426,7 +426,11 @@ class fMRIDataModule(pl.LightningDataModule):
             # so we skip metadata parsing and accept every subject directory.
             if self.hparams.pretraining:
                 img_root = os.path.join(self.hparams.image_path, 'img')
-                final_dict = {subj: [0, 0] for subj in sorted(os.listdir(img_root))}
+                final_dict = {
+                    subj: [0, 0]
+                    for subj in sorted(os.listdir(img_root))
+                    if os.path.isfile(os.path.join(img_root, subj, 'data.pt'))
+                }
                 _rank0_print('Load dataset {} for pretraining, {} subjects'.format(
                     self.hparams.dataset_name, len(final_dict)))
                 return final_dict

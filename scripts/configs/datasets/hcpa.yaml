@@ -1,6 +1,6 @@
 dataset_name: HCPA
-image_path: /data/cwang/remote/fmri/hcpa_processed
-image_path_fc: /data/cwang/remote/fmri/hcpa_processed
+image_path: /data_ssd/cwang/fmri/hcpa_processed
+image_path_fc: /data_ssd/cwang/fmri/hcpa_processed
 
 pretrain_only: true
 

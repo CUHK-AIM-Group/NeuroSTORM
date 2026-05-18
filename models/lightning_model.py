@@ -94,36 +94,43 @@ class LightningModel(pl.LightningModule):
         B, C, H, W, D, T = img.shape
 
         device = img.device
-        img = rearrange(img, 'b c h w d t -> b t c h w d')
+        orig_dtype = img.dtype
+        if img.dtype not in (torch.float32, torch.float64):
+            img = img.float()
 
-        rand_affine = monai_t.RandAffine(
-            prob=1.0,
-            # 0.175 rad = 10 degrees
-            rotate_range=(0.175, 0.175, 0.175),
-            scale_range = (0.1, 0.1, 0.1),
-            mode = "bilinear",
-            padding_mode = "border",
-            device = device
-        )
-        rand_noise = monai_t.RandGaussianNoise(prob=0.3, std=0.1)
-        rand_smooth = monai_t.RandGaussianSmooth(sigma_x=(0.0, 0.5), sigma_y=(0.0, 0.5), sigma_z=(0.0, 0.5), prob=0.1)
-        if self.hparams.augment_only_intensity:
-            comp = monai_t.Compose([rand_noise, rand_smooth])
-        else:
-            comp = monai_t.Compose([rand_affine, rand_noise, rand_smooth])
+        with torch.autocast(device_type=device.type if device.type != "cpu" else "cpu", enabled=False):
+            img = rearrange(img, 'b c h w d t -> b t c h w d')
 
-        for b in range(B):
-            aug_seed = torch.randint(0, 10000000, (1,)).item()
-            # set augmentation seed to be the same for all time steps
-            for t in range(T):
-                if self.hparams.augment_only_affine:
-                    rand_affine.set_random_state(seed=aug_seed)
-                    img[b, t, :, :, :, :] = rand_affine(img[b, t, :, :, :, :])
-                else:
-                    comp.set_random_state(seed=aug_seed)
-                    img[b, t, :, :, :, :] = comp(img[b, t, :, :, :, :])
+            rand_affine = monai_t.RandAffine(
+                prob=1.0,
+                # 0.175 rad = 10 degrees
+                rotate_range=(0.175, 0.175, 0.175),
+                scale_range = (0.1, 0.1, 0.1),
+                mode = "bilinear",
+                padding_mode = "border",
+                device = device
+            )
+            rand_noise = monai_t.RandGaussianNoise(prob=0.3, std=0.1)
+            rand_smooth = monai_t.RandGaussianSmooth(sigma_x=(0.0, 0.5), sigma_y=(0.0, 0.5), sigma_z=(0.0, 0.5), prob=0.1)
+            if self.hparams.augment_only_intensity:
+                comp = monai_t.Compose([rand_noise, rand_smooth])
+            else:
+                comp = monai_t.Compose([rand_affine, rand_noise, rand_smooth])
 
-        img = rearrange(img, 'b t c h w d -> b c h w d t')
+            for b in range(B):
+                aug_seed = torch.randint(0, 10000000, (1,)).item()
+                # set augmentation seed to be the same for all time steps
+                for t in range(T):
+                    if self.hparams.augment_only_affine:
+                        rand_affine.set_random_state(seed=aug_seed)
+                        img[b, t, :, :, :, :] = rand_affine(img[b, t, :, :, :, :])
+                    else:
+                        comp.set_random_state(seed=aug_seed)
+                        img[b, t, :, :, :, :] = comp(img[b, t, :, :, :, :])
+
+            img = rearrange(img, 'b t c h w d -> b c h w d t')
+        if img.dtype != orig_dtype:
+            img = img.to(orig_dtype)
 
         return img
     
