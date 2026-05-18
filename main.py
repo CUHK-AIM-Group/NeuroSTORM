@@ -232,6 +232,8 @@ def cli_main():
         trainer_devices = None
         strategy = None
 
+    use_custom_sampler = getattr(args, 'sampling_strategy', None) is not None
+
     if args.grad_clip:
         trainer = pl.Trainer.from_argparse_args(
             args,
@@ -243,6 +245,7 @@ def cli_main():
             accelerator=accelerator,
             devices=trainer_devices,
             strategy=strategy,
+            replace_sampler_ddp=not use_custom_sampler,
         )
     else:
         trainer = pl.Trainer.from_argparse_args(
@@ -253,6 +256,7 @@ def cli_main():
             accelerator=accelerator,
             devices=trainer_devices,
             strategy=strategy,
+            replace_sampler_ddp=not use_custom_sampler,
         )
 
     # ------------ model -------------

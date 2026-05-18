@@ -20,6 +20,9 @@ class MultiDatasetSampler(Sampler):
 
     Subclasses implement `_compute_indices()` which returns the list of global
     indices (into the ConcatDataset) to use for the current epoch.
+
+    DDP-aware: when running in distributed mode, each rank gets a disjoint
+    slice of the indices. Set replace_sampler_ddp=False in the Trainer.
     """
 
     def __init__(self, concat_dataset, seed=0):
@@ -28,6 +31,18 @@ class MultiDatasetSampler(Sampler):
         self.num_datasets = len(self.cumulative_sizes)
         self.seed = seed
         self.epoch = 0
+
+    @property
+    def rank(self):
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            return torch.distributed.get_rank()
+        return 0
+
+    @property
+    def world_size(self):
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            return torch.distributed.get_world_size()
+        return 1
 
     def set_epoch(self, epoch):
         self.epoch = epoch
@@ -46,40 +61,61 @@ class MultiDatasetSampler(Sampler):
 
     def __iter__(self):
         indices = self._compute_indices()
+        # DDP sharding: each rank takes its slice
+        if self.world_size > 1:
+            indices = indices[self.rank::self.world_size]
         return iter(indices)
 
     def __len__(self):
-        return len(self._compute_indices())
+        total = len(self._compute_indices())
+        if self.world_size > 1:
+            return (total + self.world_size - 1) // self.world_size
+        return total
 
 
 class UniformSubsampleStrategy(MultiDatasetSampler):
-    """Strategy 1: Uniform subsampling.
+    """Strategy 1: Uniform subsampling by subject.
 
-    Each epoch, randomly sample at most `max_samples` from each sub-dataset.
-    All datasets contribute equally (capped), preventing large datasets from
-    dominating. Different random subset each epoch.
+    Each epoch, randomly sample at most `max_subjects` subjects from each
+    sub-dataset, then include ALL clips belonging to those subjects.
+    Different random subset of subjects each epoch.
     """
 
     def __init__(self, concat_dataset, max_samples_per_dataset=500, seed=0):
         super().__init__(concat_dataset, seed=seed)
-        self.max_samples = max_samples_per_dataset
+        self.max_subjects = max_samples_per_dataset
+        self._subject_groups = self._build_subject_groups()
+
+    def _build_subject_groups(self):
+        """Build per-dataset mapping: subject_index -> list of global indices."""
+        groups = []
+        offset = 0
+        for ds in self.concat_dataset.datasets:
+            subj_to_indices = {}
+            for local_idx, item in enumerate(ds.data):
+                subj_idx = item[0]
+                global_idx = offset + local_idx
+                if subj_idx not in subj_to_indices:
+                    subj_to_indices[subj_idx] = []
+                subj_to_indices[subj_idx].append(global_idx)
+            groups.append(subj_to_indices)
+            offset += len(ds.data)
+        return groups
 
     def _compute_indices(self):
         rng = np.random.RandomState(self.seed + self.epoch)
         indices = []
-        for start, end in self._dataset_ranges():
-            size = end - start
-            n = min(size, self.max_samples)
-            chosen = rng.choice(size, n, replace=False) + start
-            indices.extend(chosen.tolist())
+        for subj_to_indices in self._subject_groups:
+            all_subjs = list(subj_to_indices.keys())
+            n = min(len(all_subjs), self.max_subjects)
+            chosen_subjs = rng.choice(all_subjs, n, replace=False)
+            for s in chosen_subjs:
+                indices.extend(subj_to_indices[s])
         rng.shuffle(indices)
         return indices
 
     def __len__(self):
-        total = 0
-        for start, end in self._dataset_ranges():
-            total += min(end - start, self.max_samples)
-        return total
+        return len(self._compute_indices())
 
 
 class LossWeightedStrategy(MultiDatasetSampler):
