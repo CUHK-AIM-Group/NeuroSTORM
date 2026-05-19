@@ -461,8 +461,8 @@ class UKB(BaseDataset):
             subject_path = os.path.join(img_root, subject_name)
 
             num_frames = self._count_frames(subject_path)
-            if num_frames < self.stride:
-                raise ValueError(f'subject {subject_name}: num_frames={num_frames} < stride={self.stride}')
+            if num_frames < self.sample_duration:
+                continue
             session_duration = num_frames - self.sample_duration + 1
 
             for start_frame in range(0, session_duration, self.stride):
@@ -488,8 +488,8 @@ class HCPTASK(BaseDataset):
             subject_path = os.path.join(img_root, subject_name)
 
             num_frames = self._count_frames(subject_path)
-            if num_frames < self.stride:
-                raise ValueError(f'subject {subject_name}: num_frames={num_frames} < stride={self.stride}')
+            if num_frames < self.sample_duration:
+                continue
             session_duration = num_frames - self.sample_duration + 1
 
             # we only use first n frames for task fMRI

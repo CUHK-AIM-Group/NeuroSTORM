@@ -3,7 +3,7 @@ from .bnt import BrainNetworkTransformer, BNTRegression
 from .lggnn import LGGNN, LGGNNRegression
 from .combraintf import ComBrainTF, ComBrainTFRegression
 from .ibgnn import IBGNN, IBGNNRegression
-from .brainnetcnn import BrainNetCNN, BrainNetCNNRegression, BrainNetCNNDeep
+from .brainnetcnn import BrainNetCNN, BrainNetCNNRegression, BrainNetCNNDeep, create_brainnetcnn
 
 
 def load_model(model_name, hparams=None):
@@ -101,7 +101,7 @@ def load_model(model_name, hparams=None):
         # BrainNetworkTransformer for FC-based fMRI analysis
         num_rois = getattr(hparams, 'num_rois', 200)
         pos_encoding = getattr(hparams, 'pos_encoding', 'identity')
-        pos_embed_dim = getattr(hparams, 'pos_embed_dim', 32)
+        pos_embed_dim = getattr(hparams, 'pos_embed_dim', 8)
         pooling_sizes = getattr(hparams, 'pooling_sizes', [100, 50, 25])
         do_pooling = getattr(hparams, 'do_pooling', [True, True, False])
         hidden_size = getattr(hparams, 'hidden_size', 1024)
@@ -226,41 +226,20 @@ def load_model(model_name, hparams=None):
                 use_edge_attr=use_edge_attr
             )
     elif model_name == "brainnetcnn":
-        # BrainNetCNN for connectivity matrix analysis
         num_rois = getattr(hparams, 'num_rois', 200)
         variant = getattr(hparams, 'brainnetcnn_variant', 'standard')
-        e2e_channels = getattr(hparams, 'e2e_channels', [32, 64, 64])
-        e2n_channels = getattr(hparams, 'e2n_channels', 128)
+        e2e_channels = getattr(hparams, 'e2e_channels', [32])
+        e2n_channels = getattr(hparams, 'e2n_channels', 64)
         n2g_channels = getattr(hparams, 'n2g_channels', 256)
-        fc_channels = getattr(hparams, 'fc_channels', [128, 64])
 
-        if variant == 'deep':
-            net = BrainNetCNNDeep(
-                num_rois=num_rois,
-                num_classes=1 if hparams.downstream_task_type == 'regression' else hparams.num_classes,
-                dropout=getattr(hparams, 'dropout', 0.5)
-            )
-        else:
-            if hparams.downstream_task_type == 'regression':
-                net = BrainNetCNNRegression(
-                    num_rois=num_rois,
-                    num_classes=1,
-                    e2e_channels=e2e_channels,
-                    e2n_channels=e2n_channels,
-                    n2g_channels=n2g_channels,
-                    fc_channels=fc_channels,
-                    dropout=getattr(hparams, 'dropout', 0.5)
-                )
-            else:
-                net = BrainNetCNN(
-                    num_rois=num_rois,
-                    num_classes=hparams.num_classes,
-                    e2e_channels=e2e_channels,
-                    e2n_channels=e2n_channels,
-                    n2g_channels=n2g_channels,
-                    fc_channels=fc_channels,
-                    dropout=getattr(hparams, 'dropout', 0.5)
-                )
+        num_classes = 1 if hparams.downstream_task_type == 'regression' else hparams.num_classes
+        task_type = 'regression' if hparams.downstream_task_type == 'regression' else 'classification'
+        net = create_brainnetcnn(
+            task_type=task_type, variant=variant,
+            num_rois=num_rois, num_classes=num_classes,
+            e2e_channels=e2e_channels, e2n_channels=e2n_channels,
+            n2g_channels=n2g_channels, dropout=getattr(hparams, 'dropout', 0.5)
+        )
     elif model_name == "emb_mlp":
         from .heads import EmbHead
         num_tokens = hparams.embed_dim * (hparams.c_multiplier ** (n_stages - 1))

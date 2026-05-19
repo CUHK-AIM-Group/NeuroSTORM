@@ -20,10 +20,10 @@ def count_frames_for_subject(subject_path):
     blob_path = os.path.join(subject_path, "data.pt")
     if os.path.isfile(blob_path):
         try:
-            peek = torch.load(blob_path, mmap=True, weights_only=True)
+            peek = torch.load(blob_path, mmap=True, weights_only=False)
         except RuntimeError:
             try:
-                peek = torch.load(blob_path, mmap=False, weights_only=True)
+                peek = torch.load(blob_path, mmap=False, weights_only=False)
             except Exception:
                 return 0
         n = int(peek["num_frames"])

@@ -88,6 +88,7 @@ def cli_main():
     parser.add_argument("--print_flops", action='store_true', help="Whether to print the number of FLOPs")
     parser.add_argument("--gpu_ids", type=str, default=None, help="Comma-separated list of GPU IDs to use (e.g., '0,1,2'). If not specified, uses all available GPUs")
     parser.add_argument("--num_gpus", type=int, default=None, help="Number of GPUs to use. If not specified, uses all available GPUs or those specified by --gpu_ids")
+    parser.add_argument("--output_dir", type=str, default=None, help="Override output directory (bypasses category_dir/project_name logic)")
 
     # Set dataset
     Dataset = fMRIDataModule
@@ -129,7 +130,11 @@ def cli_main():
         category_dir = "fc-based"
     else:
         category_dir = "other"
-    setattr(args, "default_root_dir", os.path.join('output', category_dir, args.project_name))
+
+    if args.output_dir is not None:
+        setattr(args, "default_root_dir", args.output_dir)
+    else:
+        setattr(args, "default_root_dir", os.path.join('output', category_dir, args.project_name))
 
     resume_ckpt_path = None if args.resume_ckpt_path is None else args.resume_ckpt_path
     if args.resume_ckpt_path is None and args.auto_resume:

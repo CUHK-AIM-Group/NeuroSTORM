@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Subset, ConcatDataset, Sampler
+from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.data import DataLoader as GeometricDataLoader
 from .fmri_datasets import HCP1200, ABCD, UKB, Cobre, ADHD200, UCLA, HCPEP, HCPTASK, GOD, MOVIE, TransDiag
 from .roi_datasets import ROIDataset, FCDataset, FCGraphDataset
@@ -81,7 +82,7 @@ class UniformSubsampleStrategy(MultiDatasetSampler):
     Different random subset of subjects each epoch.
     """
 
-    def __init__(self, concat_dataset, max_samples_per_dataset=500, seed=0):
+    def __init__(self, concat_dataset, max_samples_per_dataset=100, seed=0):
         super().__init__(concat_dataset, seed=seed)
         self.max_subjects = max_samples_per_dataset
         self._subject_groups = self._build_subject_groups()
@@ -113,10 +114,6 @@ class UniformSubsampleStrategy(MultiDatasetSampler):
                 indices.extend(subj_to_indices[s])
         rng.shuffle(indices)
         return indices
-
-    def __len__(self):
-        return len(self._compute_indices())
-
 
 class LossWeightedStrategy(MultiDatasetSampler):
     """Strategy 2: Loss-weighted resampling.
@@ -184,17 +181,40 @@ SAMPLING_STRATEGIES = {
 }
 
 
-def build_multi_dataset_sampler(strategy_name, concat_dataset, hparams):
-    """Factory function to build a multi-dataset sampler from hparams."""
+def build_multi_dataset_sampler(strategy_name, concat_dataset, hparams, mode='train'):
+    """Factory function to build a multi-dataset sampler from hparams.
+
+    For mode in {'val', 'test'}, the per-dataset cap is scaled from the train
+    cap by (split_ratio / train_split) so eval sees the same subject ratio.
+    """
     seed = getattr(hparams, 'seed', 0)
+    train_max = getattr(hparams, 'max_samples_per_dataset', 100)
+    train_split = getattr(hparams, 'train_split', 0.9)
+    val_split = getattr(hparams, 'val_split', 0.1)
+    test_split = max(0.0, 1.0 - train_split - val_split) or val_split
+
+    if mode == 'train':
+        max_samples = train_max
+        # Different epoch each call
+        epoch_seed = seed
+    elif mode == 'val':
+        max_samples = max(1, int(round(train_max * (val_split / max(train_split, 1e-8)))))
+        epoch_seed = seed + 10_000
+    elif mode == 'test':
+        max_samples = max(1, int(round(train_max * (test_split / max(train_split, 1e-8)))))
+        epoch_seed = seed + 20_000
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
     if strategy_name == "uniform_subsample":
-        max_samples = getattr(hparams, 'max_samples_per_dataset', 500)
-        return UniformSubsampleStrategy(concat_dataset, max_samples_per_dataset=max_samples, seed=seed)
+        return UniformSubsampleStrategy(concat_dataset, max_samples_per_dataset=max_samples, seed=epoch_seed)
     elif strategy_name == "loss_weighted":
+        # Eval modes always use uniform subsampling (loss weighting is for train).
+        if mode != 'train':
+            return UniformSubsampleStrategy(concat_dataset, max_samples_per_dataset=max_samples, seed=epoch_seed)
         num_datasets = len(concat_dataset.cumulative_sizes)
-        max_samples = getattr(hparams, 'max_samples_per_dataset', 500)
         total = max_samples * num_datasets
-        return LossWeightedStrategy(concat_dataset, total_samples_per_epoch=total, seed=seed)
+        return LossWeightedStrategy(concat_dataset, total_samples_per_epoch=total, seed=epoch_seed)
     else:
         raise ValueError(f"Unknown sampling strategy: {strategy_name}. "
                          f"Available: {list(SAMPLING_STRATEGIES.keys())}")
@@ -996,17 +1016,38 @@ class fMRIDataModule(pl.LightningDataModule):
                 self.hparams.sampling_strategy,
                 self.train_dataset,
                 self.hparams,
+                mode='train',
             )
             train_params = get_params(train=True)
             train_params["shuffle"] = False
             train_params["sampler"] = self._train_sampler
             self.train_loader = DataLoader(self.train_dataset, **train_params)
-            self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
-            self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
+            self._eval_params = get_params(train=False)
+            self._use_distributed_eval = True
+            self.val_loader = None
+            self.test_loader = None
         else:
             self.train_loader = DataLoader(self.train_dataset, **get_params(train=True))
             self.val_loader = DataLoader(self.val_dataset, **get_params(train=False))
             self.test_loader = DataLoader(self.test_dataset, **get_params(train=False))
+
+    def _build_eval_loader(self, dataset, mode):
+        params = dict(self._eval_params)
+        # If user enabled a multi-dataset sampling strategy and this is a
+        # ConcatDataset, mirror the train-time subsampling on val/test by
+        # building an eval-mode strategy sampler. The custom sampler shards
+        # itself across DDP ranks, so we don't also wrap it in DistributedSampler.
+        strategy_name = getattr(self.hparams, 'sampling_strategy', None)
+        if strategy_name is not None and isinstance(dataset, ConcatDataset):
+            sampler = build_multi_dataset_sampler(
+                strategy_name, dataset, self.hparams, mode=mode,
+            )
+            params["sampler"] = sampler
+            params["shuffle"] = False
+        elif self._use_distributed_eval and torch.distributed.is_available() and torch.distributed.is_initialized():
+            params["sampler"] = DistributedSampler(dataset, shuffle=False)
+            params["shuffle"] = False
+        return DataLoader(dataset, **params)
 
     def train_dataloader(self):
         if self._train_sampler is not None:
@@ -1014,9 +1055,14 @@ class fMRIDataModule(pl.LightningDataModule):
         return self.train_loader
 
     def val_dataloader(self):
+        if self.val_loader is None:
+            self.val_loader = self._build_eval_loader(self.val_dataset, mode='val')
+            self.test_loader = self._build_eval_loader(self.test_dataset, mode='test')
         return [self.val_loader, self.test_loader]
 
     def test_dataloader(self):
+        if self.test_loader is None:
+            self.test_loader = self._build_eval_loader(self.test_dataset, mode='test')
         return self.test_loader
 
     def predict_dataloader(self):
@@ -1054,7 +1100,7 @@ class fMRIDataModule(pl.LightningDataModule):
                           help="Multi-dataset sampling strategy for pretraining. "
                                "'uniform_subsample': cap each dataset to --max_samples_per_dataset per epoch. "
                                "'loss_weighted': resample proportional to per-dataset loss.")
-        group.add_argument("--max_samples_per_dataset", type=int, default=500,
+        group.add_argument("--max_samples_per_dataset", type=int, default=100,
                           help="Max samples per dataset per epoch (used by uniform_subsample and as base for loss_weighted)")
 
         # New arguments for ROI/FC data

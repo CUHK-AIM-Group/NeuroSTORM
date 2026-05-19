@@ -1,6 +1,6 @@
 dataset_name: HCP1200
-image_path: /data_ssd/cwang/fmri/hcpya_preprocessed
-image_path_fc: /data_ssd/cwang/fmri/hcpya_preprocessed
+image_path: /data/cwang/remote/fmri/hcpya_preprocessed
+image_path_fc: /data/cwang/remote/fmri/hcpya_preprocessed
 
 tasks:
   task1:
@@ -8,6 +8,11 @@ tasks:
     task_name: sex
     downstream_task_type: classification
     num_classes: 2
+  task1_age:
+    downstream_task_id: 1
+    task_name: age
+    downstream_task_type: regression
+    num_classes: 1
   task2:
     downstream_task_id: 2
     task_name: MMSE_Score

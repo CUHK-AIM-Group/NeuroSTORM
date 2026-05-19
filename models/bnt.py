@@ -41,10 +41,7 @@ class InterpretableTransformerEncoder(TransformerEncoderLayer):
 
 
 class ClusterAssignment(nn.Module):
-    """
-    Cluster assignment module for graph pooling.
-    Uses soft assignment to cluster nodes into communities.
-    """
+    """Cluster assignment with projection mode and orthogonal init."""
 
     def __init__(self, cluster_number, hidden_dimension, alpha=1.0,
                  orthogonal=True, freeze_center=False, project_assignment=True):
@@ -52,38 +49,43 @@ class ClusterAssignment(nn.Module):
         self.cluster_number = cluster_number
         self.hidden_dimension = hidden_dimension
         self.alpha = alpha
-        self.orthogonal = orthogonal
         self.project_assignment = project_assignment
 
-        # Cluster centers
-        self.cluster_centers = nn.Parameter(
-            torch.zeros(cluster_number, hidden_dimension),
-            requires_grad=not freeze_center
-        )
-        nn.init.xavier_uniform_(self.cluster_centers)
+        centers = torch.zeros(cluster_number, hidden_dimension, dtype=torch.float)
+        nn.init.xavier_uniform_(centers)
+        if orthogonal:
+            ortho = torch.zeros_like(centers)
+            ortho[0] = centers[0]
+            for i in range(1, cluster_number):
+                proj = torch.zeros_like(centers[0])
+                for j in range(i):
+                    dot_uv = torch.dot(ortho[j], centers[i])
+                    dot_uu = torch.dot(ortho[j], ortho[j]).clamp(min=1e-8)
+                    proj = proj + (dot_uv / dot_uu) * ortho[j]
+                ortho[i] = centers[i] - proj
+                ortho[i] = ortho[i] / ortho[i].norm(p=2).clamp(min=1e-8)
+            centers = ortho
+        self.cluster_centers = nn.Parameter(centers, requires_grad=not freeze_center)
 
     def forward(self, batch):
         """
-        Compute soft cluster assignment using Student's t-distribution.
-
         Args:
             batch: [batch_size * num_nodes, hidden_dimension]
-
         Returns:
             assignment: [batch_size * num_nodes, cluster_number]
         """
-        # Compute pairwise distances
+        if self.project_assignment:
+            assign = batch @ self.cluster_centers.T
+            assign = assign.pow(2)
+            norm = self.cluster_centers.norm(p=2, dim=-1)
+            assign = assign / norm.clamp(min=1e-8)
+            return F.softmax(assign, dim=-1)
+        # Student's t-distribution fallback
         norm_squared = torch.sum((batch.unsqueeze(1) - self.cluster_centers) ** 2, 2)
-
-        # Student's t-distribution (Equation 1 in DEC paper)
         numerator = 1.0 / (1.0 + (norm_squared / self.alpha))
         power = (self.alpha + 1) / 2
         numerator = numerator ** power
-
-        # Normalize
-        assignment = numerator / torch.sum(numerator, dim=1, keepdim=True)
-
-        return assignment
+        return numerator / torch.sum(numerator, dim=1, keepdim=True).clamp(min=1e-8)
 
     def get_cluster_centers(self):
         return self.cluster_centers
@@ -137,19 +139,15 @@ class DEC(nn.Module):
         return node_repr, assignment
 
     def target_distribution(self, batch):
-        """
-        Compute target distribution for KL divergence loss.
-        """
-        weight = (batch ** 2) / torch.sum(batch, 0)
-        return (weight.t() / torch.sum(weight, 1)).t()
+        """Compute target distribution for KL divergence loss."""
+        weight = (batch ** 2) / torch.sum(batch, 0).clamp(min=1e-8)
+        return (weight.t() / torch.sum(weight, 1).clamp(min=1e-8)).t()
 
     def loss(self, assignment):
-        """
-        Compute KL divergence loss for cluster assignment.
-        """
+        """Compute KL divergence loss for cluster assignment."""
         flattened_assignment = assignment.view(-1, assignment.size(-1))
         target = self.target_distribution(flattened_assignment).detach()
-        return self.loss_fn(flattened_assignment.log(), target)
+        return self.loss_fn(flattened_assignment.clamp(min=1e-10).log(), target)
 
 
 class TransPoolingEncoder(nn.Module):
@@ -223,7 +221,7 @@ class BrainNetworkTransformer(nn.Module):
         node_feature_size=200,
         num_classes=2,
         pos_encoding='identity',
-        pos_embed_dim=32,
+        pos_embed_dim=8,
         pooling_sizes=[100, 50, 25],
         do_pooling=[True, True, False],
         hidden_size=1024,

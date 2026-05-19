@@ -137,7 +137,13 @@ class LightningModel(pl.LightningModule):
     def _compute_logits(self, batch, augment_during_training=None):
         # Handle PyG graph batch (BrainGNN, LG-GNN, etc.)
         if hasattr(batch, 'edge_index'):
-            out = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.batch, batch.pos)
+            model_name = getattr(self.hparams, 'model', '')
+            if model_name == 'braingnn':
+                out = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.batch, batch.pos)
+            elif model_name == 'ibgnn':
+                out = self.model(batch.x, batch.edge_index, None, batch.batch)
+            else:
+                out = self.model(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
             if isinstance(out, tuple):
                 logits = out[0]
             else:
@@ -154,7 +160,7 @@ class LightningModel(pl.LightningModule):
                     target = (unnormalized_target - self.scaler.mean_[0]) / (self.scaler.scale_[0])
                 elif self.hparams.label_scaling_method == 'minmax':
                     target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
-            return subj, logits, target, head_features
+            return subj, logits, target, head_features, None
 
         # Handle FC/BNT dict batch (4 keys: node_feature/fc_matrix, subject_name, target, sex)
         if isinstance(batch, dict) and ('node_feature' in batch or 'fc_matrix' in batch):
@@ -162,8 +168,11 @@ class LightningModel(pl.LightningModule):
             subj = batch['subject_name']
             target_value = batch['target']
             out = self.model(fmri)
+            assignments = None
             if isinstance(out, tuple):
                 logits = out[0]
+                if len(out) > 1:
+                    assignments = out[1]
             else:
                 logits = out
             head_features = None
@@ -176,7 +185,7 @@ class LightningModel(pl.LightningModule):
                     target = (unnormalized_target - self.scaler.mean_[0]) / (self.scaler.scale_[0])
                 elif self.hparams.label_scaling_method == 'minmax':
                     target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
-            return subj, logits, target, head_features
+            return subj, logits, target, head_features, assignments
 
         fmri, subj, target_value, tr, sex = batch.values()
 
@@ -205,9 +214,9 @@ class LightningModel(pl.LightningModule):
                 target = (unnormalized_target - self.scaler.mean_[0]) / (self.scaler.scale_[0])
             elif self.hparams.label_scaling_method == 'minmax':
                 target = (unnormalized_target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
-        
-        return subj, logits, target, head_features
-    
+
+        return subj, logits, target, head_features, None
+
     def _calculate_loss(self, batch, mode):
         if self.hparams.pretraining:
             start_time_data_read = time.time()
@@ -295,7 +304,7 @@ class LightningModel(pl.LightningModule):
             # print(f"Data time: {data_time:.6f} seconds")
 
             start_time_model = time.time()
-            subj, logits, target, _ = self._compute_logits(batch, augment_during_training=self.hparams.augment_during_training)
+            subj, logits, target, _, assignments = self._compute_logits(batch, augment_during_training=self.hparams.augment_during_training)
             end_time_model = time.time()
             model_time = end_time_model - start_time_model
             # print(f"Model time: {model_time:.6f} seconds")
@@ -308,7 +317,11 @@ class LightningModel(pl.LightningModule):
                 else:
                     loss = F.cross_entropy(logits, target.long().squeeze())
                     acc = self.metric.get_accuracy(logits, target.float().squeeze())
-                
+
+                if assignments is not None and hasattr(self.model, 'compute_pooling_loss'):
+                    dec_loss = self.model.compute_pooling_loss(assignments)
+                    loss = loss + dec_loss
+
                 result_dict = {
                     f"{mode}_loss": loss,
                     f"{mode}_acc": acc,
@@ -323,7 +336,7 @@ class LightningModel(pl.LightningModule):
                     f"{mode}_l1_loss": l1
                 }
         
-        self.log_dict(result_dict, prog_bar=True, sync_dist=False, add_dataloader_idx=False, on_step=(mode == 'train'), on_epoch=(mode != 'train'), batch_size=self.hparams.batch_size)
+        self.log_dict(result_dict, prog_bar=True, sync_dist=(mode != 'train'), add_dataloader_idx=False, on_step=(mode == 'train'), on_epoch=(mode != 'train'), batch_size=self.hparams.batch_size)
         
         return loss
 
@@ -474,7 +487,7 @@ class LightningModel(pl.LightningModule):
             else:
                 self._calculate_loss(batch, mode="test")
         else:
-            subj, logits, target, head_features = self._compute_logits(batch)
+            subj, logits, target, head_features, _ = self._compute_logits(batch)
             if self.hparams.downstream_task_type == 'multi_task':
                 output = torch.stack([logits[1].squeeze(), target], dim=1)
                 output = output.detach().cpu()
@@ -575,7 +588,7 @@ class LightningModel(pl.LightningModule):
         if self.hparams.pretraining:
             self._calculate_loss(batch, mode="test")
         else:
-            subj, logits, target, head_features = self._compute_logits(batch)
+            subj, logits, target, head_features, _ = self._compute_logits(batch)
             output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu(), None if head_features is None else head_features.detach().cpu()]
 
             return (subj, output)
@@ -649,6 +662,10 @@ class LightningModel(pl.LightningModule):
     def configure_optimizers(self):
         if self.hparams.optimizer == "AdamW":
             optim = torch.optim.AdamW(
+                self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay
+            )
+        elif self.hparams.optimizer == "Adam":
+            optim = torch.optim.Adam(
                 self.parameters(), lr=self.hparams.learning_rate, weight_decay=self.hparams.weight_decay
             )
         elif self.hparams.optimizer == "SGD":
@@ -768,7 +785,7 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--e2e_channels", nargs="+", default=[32, 64, 64], type=int, help="E2E conv channels for BrainNetCNN")
         group.add_argument("--e2n_channels", type=int, default=128, help="E2N conv channels for BrainNetCNN")
         group.add_argument("--n2g_channels", type=int, default=256, help="N2G conv channels for BrainNetCNN")
-        group.add_argument("--fc_channels", nargs="+", default=[128, 64], type=int, help="FC layer channels for BrainNetCNN")
+        group.add_argument("--fc_channels", nargs="*", default=[128, 64], type=int, help="FC layer channels for BrainNetCNN (empty = direct n2g->output)")
 
         # others
         group.add_argument("--scalability_check", action='store_true', help="whether to check scalability")
