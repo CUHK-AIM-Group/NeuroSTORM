@@ -30,7 +30,7 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 We welcome community contributions! Feel free to submit a PR to add support for your model or dataset.
 
 ## 🚀 Updates
-* __[2026.05.14]__: Added Task-specific Prompt Tuning (`--use_prompt_tuning --prompt_len`) for NeuroSTORM downstream adaptation; switched volume preprocessing to int8 quantization with a single `data.pt` per subject (mmap-based partial reads).
+* __[2026.05.14]__: Added Task-specific Prompt Tuning (`--tpt_strategy prompt --prompt_len 50`) for NeuroSTORM downstream adaptation; switched volume preprocessing to int8 quantization with a single `data.pt` per subject (mmap-based partial reads).
 * __[2026.05.08]__: Added BrainGNN, BNT, LG-GNN, Com-BrainTF, BrainNetCNN and IBGNN support. Framework now supports voxel (4D), ROI (2D), and FC (2D) inputs.
 * __[2026.03.24]__: Our paper has been accepted by [Nature Biomedical Engineering](https://www.nature.com/articles/s41551-026-01666-y).
 * __[2025.12.09]__: Release demo code, including automated data and model downloads. Performed age regression, gender classification, and phenotype prediction on sample data. Release the code for all benchmark tasks (task4).
@@ -103,12 +103,16 @@ python main.py \
   --model neurostorm \
   --pretraining \
   --use_mae \
-  --mask_ratio 0.75 \
+  --mask_ratio 0.5 \
   --batch_size 16 \
   --max_epochs 100
 ```
 
 ### Fine-tuning
+
+Download `pretraining/pt_neurostorm_mae_5ds.ckpt` from the
+[Hugging Face repository](https://huggingface.co/zxcvb20001/NeuroSTORM) and
+preserve the folder layout under `./checkpoints` for the commands below.
 
 ```bash
 # Gender classification (full fine-tuning)
@@ -116,7 +120,7 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
-  --load_model_path ./pretrained_models/neurostorm_mae.pth \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
   --downstream_task_type classification \
   --task_name sex \
   --num_classes 2 \
@@ -128,8 +132,8 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
-  --load_model_path ./pretrained_models/neurostorm_mae.pth \
-  --use_prompt_tuning --prompt_len 50 \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
+  --tpt_strategy prompt --prompt_len 50 \
   --downstream_task_type classification \
   --task_name sex \
   --num_classes 2 \
@@ -141,6 +145,7 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
   --downstream_task_type regression \
   --task_name age \
   --num_classes 1 \
@@ -148,22 +153,44 @@ python main.py \
   --max_epochs 50
 ```
 
+### Inference Demo
+
+Download the downstream checkpoints from
+[Hugging Face](https://huggingface.co/zxcvb20001/NeuroSTORM). The example below
+assumes the repository's `task*` folders were saved under `./checkpoints`.
+Released downstream weights currently cover Tasks 1-3; the retrieval and state
+interfaces accept compatible user-trained checkpoints.
+
+```bash
+# ABIDE disease diagnosis for one preprocessed subject
+python demo.py \
+  --mode single \
+  --ckpt_path ./checkpoints/task3/neurostorm_abide_diagnosis.ckpt \
+  --fmri_path ./data/abide_preprocessed/img/subject_id \
+  --task diagnosis
+```
+
+`demo.py` covers all five benchmark categories. Its task choices are `age`,
+`gender`, `phenotype`, `diagnosis`, `retrieval`, and `state` (Task 1 has both
+age and gender targets). It supports single-subject inference and full-dataset
+evaluation. See [USER_GUIDE.md](USER_GUIDE.md#2-quick-start--demo) for complete
+examples.
+
 **For detailed usage, data preparation, and advanced options, see [USER_GUIDE.md](USER_GUIDE.md).**
 
 
 ## 3. Project Structure
 
-Our directory structure looks like this:
+Key repository paths are:
 
 ```
-├── datasets                           <- tools and dataset class
-│   ├── atlas                          <- examples of brain atlas
-│   ├── preprocessing_volume.py        <- remove background, z-norm, int8 quantize, save one data.pt per subject
-│   ├── generate_roi_data_from_nii.py  <- extract ROI time series from volumetric fMRI
-│   ├── compute_fc.py                  <- compute functional connectivity matrices
-│   ├── compute_atlas_map.py           <- compute atlas map for masking
-│   ├── brain_extraction.sh            <- brain extraction with FSL BET
-│   ├── fmri_datasets.py               <- voxel-based dataset loaders
+├── datasets                           <- preprocessing and dataset loaders
+│   ├── atlas                          <- brain atlas files
+│   ├── preprocessing_volume.py        <- NIfTI to quantized data.pt conversion
+│   ├── compute_roi_fc.py              <- ROI time-series and FC extraction
+│   ├── compute_atlas_map.py           <- atlas map generation for masking
+│   ├── data_module.py                 <- PyTorch Lightning data module
+│   ├── fmri_datasets.py               <- voxel dataset loaders
 │   └── roi_datasets.py                <- ROI and FC dataset loaders
 │
 ├── models                 
@@ -184,8 +211,7 @@ Our directory structure looks like this:
 │   ├── brainnetcnn.py                 <- BrainNetCNN
 │   └── lightning_model.py             <- the basic lightning model class
 │
-├── utils                              <- utility modules
-│   ├── data_module.py                 <- PyTorch Lightning data module
+├── utils                              <- shared utilities
 │   ├── parser.py                      <- argument parsing utilities
 │   ├── losses.py                      <- loss functions
 │   ├── metrics.py                     <- evaluation metrics
@@ -194,19 +220,21 @@ Our directory structure looks like this:
 │
 ├── tests                              <- test suite
 │   ├── test_model_loading.py          <- model import and forward pass tests
-│   └── test_atlas_masking.py          <- atlas masking tests
+│   ├── test_atlas_masking.py          <- atlas masking tests
+│   ├── test_strd.py                   <- STRD tests
+│   └── test_demo.py                   <- inference demo tests
 │
-├── scripts                            <- training and utility scripts
-│   ├── hcp_pretrain                   <- pre-training scripts for HCP
-│   ├── hcp_downstream                 <- fine-tuning scripts for HCP
+├── scripts                            <- experiment and utility scripts
+│   ├── configs                        <- model and dataset YAML files
 │   ├── dataset_download               <- dataset download scripts
+│   ├── examples                       <- runnable experiment examples
 │   ├── install_mamba.sh               <- automatic mamba-ssm installer
+│   ├── preprocess_fc.sh               <- ROI and FC preprocessing wrapper
+│   ├── run_experiment.sh              <- universal experiment runner
 │   ├── run_demo.sh                    <- inference demo
-│   ├── run_braingnn.sh                <- BrainGNN training example
-│   └── run_bnt.sh                     <- BNT training example
+│   └── README.md                      <- runner and config reference
 │
 ├── docs                               <- project website
-├── pretrained_models                   <- pre-trained model checkpoints
 ├── .github/workflows/ci.yml           <- GitHub Actions CI configuration
 │ 
 ├── main.py                            <- training entry point
@@ -229,6 +257,8 @@ Our directory structure looks like this:
 
 - **[USER_GUIDE.md](USER_GUIDE.md)** - Complete guide for data preparation, training, and fine-tuning
 - **[INSTALLATION.md](INSTALLATION.md)** - Detailed installation instructions
+- **[scripts/README.md](scripts/README.md)** - Experiment runner and YAML configuration reference
+- **[tests/README.md](tests/README.md)** - Test suite and CI reference
 
 ## 5. Citation
 
@@ -245,7 +275,7 @@ If you use NeuroSTORM in your research, please cite:
 }
 ```
 
-## 5. Acknowledgments
+## 6. Acknowledgments
 
 We gratefully acknowledge the following projects and their authors:
 

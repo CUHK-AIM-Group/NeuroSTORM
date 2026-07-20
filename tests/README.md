@@ -9,6 +9,8 @@ tests/
 ├── __init__.py                 # Test package initialization
 ├── test_atlas_masking.py       # Tests for atlas masking functionality
 ├── test_model_loading.py       # Tests for model loading and initialization
+├── test_strd.py                # Tests for spatiotemporal redundancy dropout
+├── test_demo.py                # Tests for demo task and probability handling
 └── README.md                   # This file
 ```
 
@@ -52,10 +54,13 @@ pytest tests/ -m "not slow"
 
 ## Test Markers
 
-- `@pytest.mark.unit` - Unit tests (fast, isolated)
-- `@pytest.mark.integration` - Integration tests (slower, multiple components)
-- `@pytest.mark.slow` - Slow tests (can be skipped for quick checks)
-- `@pytest.mark.gpu` - Tests that require GPU
+- `@pytest.mark.unit` - Fast, isolated tests; used by the current model and STRD suites
+- `@pytest.mark.integration` - Reserved for tests spanning multiple components
+- `@pytest.mark.slow` - Reserved for expensive tests
+- `@pytest.mark.gpu` - Reserved for tests that require a GPU
+
+The valid marker names are defined in the repository-level `pytest.ini`. Tests
+without a marker are still included by `pytest tests/`.
 
 ## Continuous Integration
 
@@ -65,9 +70,9 @@ See [.github/workflows/ci.yml](../.github/workflows/ci.yml) for CI configuration
 
 ### CI Jobs
 
-1. **test** - Run all tests on Python 3.9, 3.10, 3.11
-2. **lint** - Check code style with flake8, black, isort
-3. **model-tests** - Test model imports and initialization
+1. **test** - Run non-GPU tests with coverage on Python 3.9, 3.10, and 3.11
+2. **lint** - Run flake8 checks for syntax and undefined-name errors
+3. **model-import** - Verify FC and graph model imports on Python 3.11
 
 ## Writing Tests
 
@@ -153,5 +158,6 @@ pip install pytest pytest-cov pytest-xdist
 
 ---
 
-**Last Updated:** 2026-05-08  
+**Last Updated:** 2026-07-21
+
 **Maintained by:** NeuroSTORM Team

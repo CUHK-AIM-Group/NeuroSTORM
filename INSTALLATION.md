@@ -2,7 +2,18 @@
 
 Complete installation guide for NeuroSTORM platform with automatic environment detection.
 
+For model usage after installation, see the [User Guide](USER_GUIDE.md). Return
+to the [project overview](README.md) for checkpoints, citation, and updates.
+
 ---
+
+## Contents
+
+1. [Quick Start](#quick-start)
+2. [Detailed Installation](#detailed-installation)
+3. [Docker Installation](#docker-installation)
+4. [GPU Configuration](#gpu-configuration)
+5. [Verification](#verification)
 
 ## Quick Start
 
@@ -275,4 +286,10 @@ python -c "from models.neurostorm import NeuroSTORM; print('NeuroSTORM OK')"
 
 # Run quick test
 python main.py --help
+
+# Verify the inference CLI
+python demo.py --help
 ```
+
+After verification, continue with the [Quick Start and Demo](USER_GUIDE.md#2-quick-start--demo)
+or the [training guide](USER_GUIDE.md#3-training-models).

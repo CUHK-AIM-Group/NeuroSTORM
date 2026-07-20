@@ -2,6 +2,10 @@
 
 Unified experiment runner with YAML-based configuration.
 
+Start with the repository [README](../README.md) and [User Guide](../USER_GUIDE.md)
+if you have not prepared the environment or data yet. This document is the
+reference for `run_experiment.sh` and files under `scripts/configs/`.
+
 ## Quick Start
 
 ```bash
@@ -47,6 +51,9 @@ bash scripts/run_experiment.sh --model <model> --dataset <dataset[,dataset...]> 
 | `--seed`        | `1`      | Random seed                         |
 | `--strategy`    | `ddp`    | Training strategy                   |
 | `--task_name`   | config   | Override task name from dataset cfg |
+| `--load_model_path` | config | Pretraining resume or fine-tuning checkpoint |
+| `--reweighting_strategy` | off | Multi-dataset pretraining reweighting |
+| `--topk`        | `10000`  | Per-dataset subject budget for reweighting |
 | `--dry_run`     | -        | Print command without executing     |
 | `-- <args>`     | -        | Pass extra args to `main.py`        |
 
@@ -68,6 +75,7 @@ bash scripts/run_experiment.sh --model <model> --dataset <dataset[,dataset...]> 
 | Dataset      | Tasks                     | Config                             |
 | ------------ | ------------------------- | ---------------------------------- |
 | `hcp1200`    | task1 (sex/age), task2    | `configs/datasets/hcp1200.yaml`    |
+| `abide`      | task3 (diagnosis)         | `configs/datasets/abide.yaml`      |
 | `adhd200`    | task3 (diagnosis)         | `configs/datasets/adhd200.yaml`    |
 | `cobre`      | task3 (diagnosis, 4-cls)  | `configs/datasets/cobre.yaml`      |
 | `ucla`       | task3 (diagnosis, 4-cls)  | `configs/datasets/ucla.yaml`       |
@@ -147,7 +155,22 @@ bash scripts/run_experiment.sh --model braingnn --dataset adhd200 --task task3 -
 ## Inference
 
 See [`scripts/run_demo.sh`](run_demo.sh) for example `demo.py` invocations
-covering single-subject inference and dataset-level evaluation.
+covering single-subject inference and dataset-level evaluation. The demo
+supports all five benchmark categories through the `age`, `gender`,
+`phenotype`, `diagnosis`, `retrieval`, and `state` task choices. Task 1 exposes
+separate age and gender targets.
+
+Download the available checkpoints from the
+[NeuroSTORM Hugging Face repository](https://huggingface.co/zxcvb20001/NeuroSTORM)
+and pass the local file with `--ckpt_path`. For example:
+
+```bash
+python demo.py \
+  --mode single \
+  --ckpt_path ./checkpoints/task3/neurostorm_abide_diagnosis.ckpt \
+  --fmri_path ./data/abide_preprocessed/img/subject_id \
+  --task diagnosis
+```
 
 ## Configuration Structure
 
@@ -176,7 +199,7 @@ batch_size: 12
 
 model_args:               # Architecture-specific args
   embed_dim: 36
-  depth: [2, 2, 6, 2]
+  depths: [2, 2, 6, 2]
   ...
 
 pretrain:                 # Pretraining config (optional)

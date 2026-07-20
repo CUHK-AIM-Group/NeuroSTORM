@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Examples for running inference with demo.py.
 #
-# demo.py supports two modes:
+# demo.py supports all five benchmark tasks in two modes:
 #   --mode single   : one preprocessed fMRI subject folder (data.pt)
 #   --mode dataset  : full dataset test split (uses image_path)
+#
+# Task 1 has separate age and gender targets. The complete --task choices are:
+# age, gender, phenotype, diagnosis, retrieval, and state.
 #
 # Fill in the placeholder paths before running.
 
@@ -51,6 +54,30 @@ python "${DEMO_PY}" \
 #     --device cuda \
 #     --label_scaling_method standardization
 
+# Disease diagnosis
+# python "${DEMO_PY}" \
+#     --mode single \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --fmri_path "${FMRI_PATH}" \
+#     --task diagnosis \
+#     --device cuda
+
+# fMRI retrieval embedding
+# python "${DEMO_PY}" \
+#     --mode single \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --fmri_path "${FMRI_PATH}" \
+#     --task retrieval \
+#     --device cuda
+
+# Task-fMRI state classification
+# python "${DEMO_PY}" \
+#     --mode single \
+#     --ckpt_path "${CKPT_PATH}" \
+#     --fmri_path "${FMRI_PATH}" \
+#     --task state \
+#     --device cuda
+
 # ---------------------------------------------------------------------------
 # Dataset-level evaluation
 # ---------------------------------------------------------------------------
@@ -61,6 +88,7 @@ python "${DEMO_PY}" \
 #     --ckpt_path "${CKPT_PATH}" \
 #     --task age \
 #     --image_path "${IMAGE_PATH}" \
-#     --gpu_ids 0 \
+#     --accelerator gpu \
+#     --devices 1 \
 #     --precision 32 \
 #     --label_scaling_method standardization

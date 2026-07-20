@@ -9,9 +9,8 @@ Complete guide for training, fine-tuning, and using NeuroSTORM models.
 1. [Data Preparation](#1-data-preparation)
 2. [Quick Start & Demo](#2-quick-start--demo)
 3. [Training Models](#3-training-models)
-4. [Fine-tuning](#4-fine-tuning)
+4. [Parameter-efficient Tuning and Resuming](#4-parameter-efficient-tuning-and-resuming)
 5. [Advanced Usage](#5-advanced-usage)
-6. [Model-Specific Guides](#6-model-specific-guides)
 
 ---
 
@@ -65,36 +64,56 @@ Dequantize at load time with `frames.to(torch.float32) * scale`.
 > falls back to `frame_*.pt`. You do not need to re-run preprocessing on
 > existing datasets.
 
-### 1.3 Converting 4D Volume to 2D ROIs
+### 1.3 Computing ROI Time Series and Functional Connectivity
 
-For graph-based models (BrainGNN, LG-GNN, IBGNN, BNT, Com-BrainTF, BrainNetCNN):
+FC- and graph-based models use ROI time series or functional-connectivity (FC)
+matrices. The same command generates both from the preprocessed `data.pt`
+blobs:
 
 ```bash
-cd NeuroSTORM/datasets
-python generate_roi_data_from_nii.py \
+python datasets/compute_roi_fc.py \
+  --input_dir ./processed_data/hcp/img \
+  --input_format blob \
   --atlas_names cc200 \
-  --dataset_names hcp \
-  --output_dir ./processed_data \
+  --fc_types correlation partial_correlation \
+  --output_dir ./processed_data/hcp \
   --num_processes 32
 ```
 
-### 1.4 Computing Functional Connectivity
+For raw NIfTI input, use `--input_format nii` and point `--input_dir` to the
+directory containing `.nii` or `.nii.gz` files. Outputs follow this layout:
 
-For graph-based models:
-
-```bash
-cd NeuroSTORM/datasets
-python compute_fc.py \
-  --roi_dir ./processed_data/roi/cc200 \
-  --output_dir ./processed_data/fc/cc200 \
-  --atlas_name cc200 \
-  --fc_types correlation partial_correlation \
-  --num_processes 8
+```text
+<output_dir>/roi/<atlas>/
+<output_dir>/fc/<atlas>/<fc_type>/
 ```
 
 ---
 
 ## 2. Quick Start & Demo
+
+`demo.py` supports all five benchmark categories. Task 1 exposes separate
+`age` and `gender` targets, so the available task names are `age`, `gender`,
+`phenotype`, `diagnosis`, `retrieval`, and `state`.
+
+| Benchmark | `--task` value | Output |
+|---|---|---|
+| Task 1: Age and gender prediction | `age` or `gender` | Scalar age or binary class |
+| Task 2: Phenotype prediction | `phenotype` | Regression value or class |
+| Task 3: Disease diagnosis | `diagnosis` | Diagnostic class |
+| Task 4: fMRI retrieval | `retrieval` | L2-normalized embedding or dataset Rank-1/mAP |
+| Task 5: Task-state classification | `state` | Cognitive-state class |
+
+Download the available checkpoints from
+[Hugging Face](https://huggingface.co/zxcvb20001/NeuroSTORM). The commands below
+assume the downloaded `task*` folders are stored under `./checkpoints`.
+Released downstream weights currently cover Tasks 1-3. The Task 4 retrieval
+and Task 5 state examples require compatible user-trained checkpoints.
+
+Single-subject regression returns the model-scale value. For checkpoints
+trained with label standardization, use dataset mode when original-unit metrics
+are required because the released checkpoints do not store the training-label
+scaler.
 
 ### 2.1 Single File Inference
 
@@ -104,25 +123,46 @@ Run inference on a single preprocessed fMRI subject:
 # Age prediction
 python demo.py \
   --mode single \
-  --ckpt_path ./pretrained_models/age.ckpt \
+  --ckpt_path ./checkpoints/task1/neurostorm_hcpya_age.ckpt \
   --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task age
 
 # Gender classification
 python demo.py \
   --mode single \
-  --ckpt_path ./pretrained_models/gender.ckpt \
+  --ckpt_path ./checkpoints/task1/neurostorm_hcpya_sex.ckpt \
   --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task gender
 
 # Phenotype prediction
 python demo.py \
   --mode single \
-  --ckpt_path ./pretrained_models/phenotype.ckpt \
+  --ckpt_path ./checkpoints/task2/neurostorm_hcpya_cogtotalcomp_ageadj.ckpt \
   --fmri_path ./data/HCP1200_MNI_to_TRs_minmax/img/100206 \
   --task phenotype \
-  --phenotype_name "CogTotalComp_Unadj" \
+  --phenotype_name "CogTotalComp_AgeAdj" \
   --phenotype_type regression
+
+# Disease diagnosis (for example, ABIDE ASD vs. control)
+python demo.py \
+  --mode single \
+  --ckpt_path ./checkpoints/task3/neurostorm_abide_diagnosis.ckpt \
+  --fmri_path /path/to/abide_preprocessed/img/subject_id \
+  --task diagnosis
+
+# fMRI retrieval embedding
+python demo.py \
+  --mode single \
+  --ckpt_path /path/to/retrieval.ckpt \
+  --fmri_path /path/to/preprocessed/img/subject_id \
+  --task retrieval
+
+# Task-fMRI state classification
+python demo.py \
+  --mode single \
+  --ckpt_path /path/to/state_classification.ckpt \
+  --fmri_path /path/to/HCPTASK_preprocessed/img/subject_task \
+  --task state
 ```
 
 ### 2.2 Batch Inference on Test Set
@@ -158,7 +198,7 @@ python main.py \
   --model neurostorm \
   --pretraining \
   --use_mae \
-  --mask_ratio 0.75 \
+  --mask_ratio 0.5 \
   --batch_size 16 \
   --learning_rate 0.0001 \
   --max_epochs 100
@@ -181,6 +221,22 @@ python main.py \
 
 ### 3.2 Fine-tuning for Downstream Tasks
 
+The recommended interface is the YAML-backed experiment runner. It keeps model,
+dataset, and task settings together:
+
+```bash
+# Full fine-tuning on HCP-YA sex classification
+bash scripts/run_experiment.sh \
+  --model neurostorm \
+  --dataset hcp1200 \
+  --task task1 \
+  --task_name sex \
+  --mode finetune \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt
+```
+
+The equivalent direct `main.py` commands are shown below.
+
 **Classification (Gender):**
 
 ```bash
@@ -188,7 +244,7 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
-  --load_model_path ./pretrained_models/neurostorm_mae.pth \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
   --downstream_task_type classification \
   --task_name sex \
   --num_classes 2 \
@@ -204,7 +260,7 @@ python main.py \
   --dataset_name HCP1200 \
   --image_path ./data/HCP1200_MNI_to_TRs_minmax \
   --model neurostorm \
-  --load_model_path ./pretrained_models/neurostorm_mae.pth \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
   --downstream_task_type regression \
   --task_name age \
   --num_classes 1 \
@@ -267,21 +323,27 @@ python main.py \
 
 ---
 
-## 4. Fine-tuning
+## 4. Parameter-efficient Tuning and Resuming
 
-### 4.1 Loading Pre-trained Weights
+### 4.1 Task-specific Parameter-efficient Tuning
 
 ```bash
 python main.py \
-  --load_model_path ./pretrained_models/neurostorm_mae.pth \
-  --use_prompt_tuning \              # freeze backbone, train per-block prompts + head
-  --prompt_len 50 \                  # k = 50 prompt tokens per block (default)
-  ...
+  --dataset_name HCP1200 \
+  --image_path ./data/HCP1200_MNI_to_TRs_minmax \
+  --model neurostorm \
+  --load_model_path ./checkpoints/pretraining/pt_neurostorm_mae_5ds.ckpt \
+  --downstream_task_type classification \
+  --task_name sex \
+  --num_classes 2 \
+  --tpt_strategy prompt \
+  --prompt_len 50
 ```
 
-`--use_prompt_tuning` enables Task-specific Prompt Tuning (TPT, NeuroSTORM only). The
-backbone is frozen and only learnable prompts (one set per Swin block) plus the output
-head are trained. Console prints the trainable / full-model parameter ratio at startup.
+`--tpt_strategy` supports `none` (full fine-tuning), `prompt`, `ln`, `linear`,
+and `prompt_ln`. The `prompt` strategy trains per-block prompt tokens and the
+task head while freezing the backbone; `--prompt_len` controls the number of
+prompt tokens per block.
 
 ### 4.2 Resume Training
 
@@ -322,7 +384,7 @@ python main.py \
 ```bash
 python main.py \
   --augment_during_training \
-  --augment_only_affine \  # or --augment_only_intensity
+  --augment_only_affine \
   ...
 ```
 
@@ -334,4 +396,3 @@ python main.py \
   --project_name my_project \
   ...
 ```
-

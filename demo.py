@@ -1,9 +1,12 @@
 """
 Unified inference demo for NeuroSTORM.
 
-Supports two modes:
+Supports all five NeuroSTORM benchmark tasks in two modes:
   1. Single-file mode: run inference on a single preprocessed fMRI subject folder.
   2. Dataset mode: evaluate on a full dataset test split via Lightning Trainer.
+
+Task 1 contains two prediction targets (age and gender), so the CLI exposes six
+task names across the five benchmark categories.
 
 Usage:
     # Single fMRI subject
@@ -26,16 +29,28 @@ import os
 import sys
 import math
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pytorch_lightning as pl
 
 from models.lightning_model import LightningModel
 from datasets.data_module import fMRIDataModule
 from utils.parser import str2bool
-from datasets.fmri_datasets import pad_to_96, resize_volume
+from datasets.fmri_datasets import BaseDataset, pad_to_96, resize_volume
 
 
-SUPPORTED_TASKS = ("age", "gender", "phenotype")
+SUPPORTED_TASKS = (
+    "age", "gender",       # Task 1
+    "phenotype",           # Task 2
+    "diagnosis",           # Task 3
+    "retrieval",           # Task 4
+    "state",               # Task 5
+)
+
+STATE_CLASS_NAMES = (
+    "EMOTION", "GAMBLING", "LANGUAGE", "MOTOR",
+    "RELATIONAL", "SOCIAL", "WM",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -83,21 +98,70 @@ def _task_config(task, args, base_hparams):
             "label_scaling_method": getattr(args, "label_scaling_method", None)
                 or base_hparams.get("label_scaling_method", "standardization"),
         },
+        "diagnosis": {
+            "task_name": "diagnosis",
+            "downstream_task_id": 3,
+            "downstream_task_type": "classification",
+            "num_classes": int(base_hparams.get("num_classes", 2)),
+        },
+        "retrieval": {
+            "task_name": "fmri_reid",
+            "downstream_task_id": 4,
+            "downstream_task_type": "classification",
+            "num_classes": int(base_hparams.get("num_classes", 2)),
+        },
+        "state": {
+            "task_name": base_hparams.get("task_name", "state_classification"),
+            "downstream_task_id": 5,
+            "downstream_task_type": "classification",
+            "num_classes": int(base_hparams.get("num_classes", 7)),
+        },
     }
 
     if task == "phenotype":
-        if not args.phenotype_name:
-            raise ValueError("--phenotype_name is required when task is 'phenotype'")
+        phenotype_name = args.phenotype_name or base_hparams.get("task_name")
+        if not phenotype_name:
+            raise ValueError(
+                "--phenotype_name is required when it is not stored in the checkpoint"
+            )
+        phenotype_type = (
+            args.phenotype_type
+            or base_hparams.get("downstream_task_type", "classification")
+        )
+        num_classes = args.num_classes or base_hparams.get("num_classes", 2)
         task_cfg["phenotype"] = {
-            "task_name": args.phenotype_name,
+            "task_name": phenotype_name,
             "downstream_task_id": 2,
-            "downstream_task_type": args.phenotype_type,
-            "num_classes": args.num_classes if args.phenotype_type == "classification" else 1,
+            "downstream_task_type": phenotype_type,
+            "num_classes": int(num_classes) if phenotype_type == "classification" else 1,
             "label_scaling_method": getattr(args, "label_scaling_method", None)
                 or base_hparams.get("label_scaling_method", "standardization"),
         }
 
     return task_cfg[task]
+
+
+def _classification_probabilities(output, num_classes):
+    """Return one-sample class probabilities for binary or multiclass heads."""
+    flat_output = output.reshape(-1)
+    if num_classes == 2 and flat_output.numel() == 1:
+        # NeuroSTORM binary checkpoints use one BCEWithLogits output, not two
+        # softmax logits.
+        positive_prob = torch.sigmoid(flat_output[0])
+        return torch.stack((1.0 - positive_prob, positive_prob))
+
+    logits = output.reshape(-1, num_classes)[0]
+    return torch.softmax(logits, dim=0)
+
+
+def _class_name(task, pred_class, base_hparams):
+    if task == "gender":
+        return ("Female", "Male")[pred_class]
+    if task == "state" and pred_class < len(STATE_CLASS_NAMES):
+        return STATE_CLASS_NAMES[pred_class]
+    if task == "diagnosis" and base_hparams.get("dataset_name") == "ABIDE":
+        return ("Control", "ASD")[pred_class]
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +181,7 @@ def _load_single_subject(subject_path, sequence_length, stride_within_seq=1):
     need = sequence_length * stride_within_seq
 
     if os.path.isfile(blob_path):
-        blob = torch.load(blob_path, mmap=True, weights_only=True)
+        blob = BaseDataset._load_blob_file(blob_path, mmap=True)
         frames = blob['frames']                   # int8 [T, H, W, D]
         scale = float(blob['scale'])
         num_frames = int(blob['num_frames'])
@@ -166,6 +230,7 @@ def run_single(args):
     volume = _load_single_subject(args.fmri_path, sequence_length, stride_within_seq)
     volume = pad_to_96(volume)
     volume = resize_volume(volume, img_size)
+    volume = volume.unsqueeze(1)  # [B, C=1, H, W, D, T]
 
     device = torch.device(args.device)
     volume = volume.to(device)
@@ -179,12 +244,34 @@ def run_single(args):
 
     print(f"Running inference for task: {args.task}...")
     with torch.no_grad():
+        if args.task == "retrieval":
+            feature = model.model(volume)
+            if isinstance(feature, tuple):
+                feature = feature[0]
+
+            embedding = None
+            if hasattr(model.output_head, "forward_with_features"):
+                _, embedding = model.output_head.forward_with_features(feature)
+            if embedding is None:
+                embedding = feature.flatten(start_dim=2).mean(dim=2)
+            embedding = F.normalize(embedding, p=2, dim=1)
+
+            print("\n" + "=" * 50)
+            print("RESULTS")
+            print("=" * 50)
+            print("Task: retrieval")
+            print(f"Embedding shape: {tuple(embedding.shape)}")
+            print(f"L2 norm: {embedding.norm(dim=1).item():.4f}")
+            print(f"Embedding: {embedding[0].cpu().numpy()}")
+            print("=" * 50 + "\n")
+            return
+
         output = model(volume)
 
         if task_cfg["downstream_task_type"] == "classification":
-            probs = torch.softmax(output, dim=1)
-            pred_class = torch.argmax(probs, dim=1).item()
-            confidence = probs[0, pred_class].item()
+            probs = _classification_probabilities(output, task_cfg["num_classes"])
+            pred_class = torch.argmax(probs).item()
+            confidence = probs[pred_class].item()
 
             print("\n" + "=" * 50)
             print("RESULTS")
@@ -192,9 +279,10 @@ def run_single(args):
             print(f"Task: {args.task}")
             print(f"Predicted class: {pred_class}")
             print(f"Confidence: {confidence:.4f}")
-            print(f"All probabilities: {probs[0].cpu().numpy()}")
-            if args.task == "gender":
-                print(f"Predicted gender: {'Male' if pred_class == 1 else 'Female'}")
+            print(f"All probabilities: {probs.cpu().numpy()}")
+            class_name = _class_name(args.task, pred_class, base_hparams)
+            if class_name is not None:
+                print(f"Predicted label: {class_name}")
         else:
             pred_value = output.item()
 
@@ -311,8 +399,9 @@ def parse_args():
     pheno = parser.add_argument_group("phenotype task")
     pheno.add_argument("--phenotype_name", default=None)
     pheno.add_argument("--phenotype_type", choices=["classification", "regression"],
-                       default="classification")
-    pheno.add_argument("--num_classes", type=int, default=2)
+                       default=None, help="Defaults to the checkpoint value")
+    pheno.add_argument("--num_classes", type=int, default=None,
+                       help="Defaults to the checkpoint value")
     pheno.add_argument("--label_scaling_method", choices=["standardization", "minmax"],
                        default=None)
 
