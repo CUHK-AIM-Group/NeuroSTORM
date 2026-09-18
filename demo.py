@@ -8,6 +8,12 @@ Supports all five NeuroSTORM benchmark tasks in two modes:
 Task 1 contains two prediction targets (age and gender), so the CLI exposes six
 task names across the five benchmark categories.
 
+Single mode runs the model over ALL windows of the scan (sliding window with the
+same spacing as the training/evaluation Dataset) and averages the window outputs,
+matching the full evaluation pipeline. For regression checkpoints trained with
+label normalization (e.g. the Task 1 age checkpoint uses standardization), the
+printed prediction is inverse-transformed back to the original label scale.
+
 Usage:
     # Single fMRI subject
     python demo.py \
@@ -51,6 +57,15 @@ STATE_CLASS_NAMES = (
     "EMOTION", "GAMBLING", "LANGUAGE", "MOTOR",
     "RELATIONAL", "SOCIAL", "WM",
 )
+
+# Label normalization statistics of released checkpoints, keyed by
+# (dataset_name, task_name). Checkpoints fitted with label scaling do not store
+# the scaler; these values are recomputed from each checkpoint's training split.
+#   ("HCP1200", "age"): mean/std of the 864 training subjects of split_fixed_1
+#   (HCP-YA precise-age metadata), used by neurostorm_hcpya_age.ckpt.
+KNOWN_LABEL_STATS = {
+    ("HCP1200", "age"): {"standardization": (28.759259, 3.681461)},
+}
 
 
 # ---------------------------------------------------------------------------
@@ -164,31 +179,115 @@ def _class_name(task, pred_class, base_hparams):
     return None
 
 
+def _label_stats(args, base_hparams, task_cfg):
+    """Resolve label-scaling statistics for inverse transformation.
+
+    Priority: CLI arguments > checkpoint hyper_parameters > KNOWN_LABEL_STATS
+    (released-checkpoint defaults). Returns ``(method, stats, source)`` where
+    ``stats`` is ``(mean, std)`` for standardization or ``(min, max)`` for
+    minmax, or ``None`` when the task needs no inverse transform.
+    """
+    if task_cfg["downstream_task_type"] != "regression":
+        return None
+    method = task_cfg.get("label_scaling_method", "standardization")
+
+    if method == "standardization":
+        mean = getattr(args, "label_mean", None)
+        std = getattr(args, "label_std", None)
+        source = "command line"
+        if mean is None or std is None:
+            mean = base_hparams.get("label_mean")
+            std = base_hparams.get("label_std")
+            source = "checkpoint"
+        if mean is None or std is None:
+            known = KNOWN_LABEL_STATS.get(
+                (base_hparams.get("dataset_name"), task_cfg["task_name"]), {}
+            ).get("standardization")
+            if known is not None:
+                mean, std = known
+                source = "released-checkpoint defaults (train split of the released model)"
+        if mean is None or std is None:
+            return (method, None, None)
+        return (method, (float(mean), float(std)), source)
+
+    if method == "minmax":
+        vmin = getattr(args, "label_min", None)
+        vmax = getattr(args, "label_max", None)
+        source = "command line"
+        if vmin is None or vmax is None:
+            vmin = base_hparams.get("label_min")
+            vmax = base_hparams.get("label_max")
+            source = "checkpoint"
+        if vmin is None or vmax is None:
+            return (method, None, None)
+        return (method, (float(vmin), float(vmax)), source)
+
+    return None
+
+
+def _inverse_transform(value, stats_entry):
+    """Map a raw network output back to the original label scale."""
+    method, stats, _ = stats_entry
+    if stats is None:
+        return None
+    if method == "standardization":
+        mean, std = stats
+        return value * std + mean
+    if method == "minmax":
+        vmin, vmax = stats
+        return value * (vmax - vmin) + vmin
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Single-file helpers
 # ---------------------------------------------------------------------------
 
-def _load_single_subject(subject_path, sequence_length, stride_within_seq=1):
-    """Load a clip of ``sequence_length`` frames from ``subject_path``.
+def _window_starts(num_frames, sample_duration, window_step, max_windows=None):
+    """Window start indices, matching the training/evaluation Dataset layout."""
+    if num_frames < sample_duration:
+        raise ValueError(
+            f"Not enough frames: have {num_frames}, need at least {sample_duration}"
+        )
+    starts = list(range(0, num_frames - sample_duration + 1, window_step))
+    if max_windows is not None:
+        starts = starts[:max_windows]
+    return starts
+
+
+def _load_subject_windows(subject_path, sequence_length, stride_within_seq=1,
+                          stride_between_seq=20, max_windows=None):
+    """Load all evaluation windows of a subject's scan.
+
+    Windows cover the whole scan: each window spans
+    ``sequence_length * stride_within_seq`` frames and consecutive windows start
+    ``stride_between_seq * sequence_length * stride_within_seq`` frames apart
+    (the same spacing as the training/evaluation Dataset). Window outputs should
+    be averaged to obtain a subject-level prediction.
 
     Supports both storage layouts:
       * new int8 blob: ``subject_path/data.pt`` (mmap-based partial read)
       * legacy per-frame: ``subject_path/frame_*.pt`` (float16)
 
-    Returns a float32 tensor of shape [1, H, W, D, T].
+    Returns ``(windows, starts)`` with ``windows`` a float32 tensor of shape
+    [n_windows, H, W, D, T].
     """
     blob_path = os.path.join(subject_path, "data.pt")
-    need = sequence_length * stride_within_seq
+    sample_duration = sequence_length * stride_within_seq
+    window_step = max(round(stride_between_seq * sample_duration), 1)
 
     if os.path.isfile(blob_path):
         blob = BaseDataset._load_blob_file(blob_path, mmap=True)
         frames = blob['frames']                   # int8 [T, H, W, D]
         scale = float(blob['scale'])
         num_frames = int(blob['num_frames'])
-        if num_frames < need:
-            raise ValueError(f"Not enough frames: have {num_frames}, need at least {need}")
-        clip = frames[0:need:stride_within_seq].to(torch.float32).mul_(scale)
-        return clip.permute(1, 2, 3, 0).unsqueeze(0)
+        starts = _window_starts(num_frames, sample_duration, window_step, max_windows)
+        clips = [
+            frames[s:s + sample_duration:stride_within_seq].to(torch.float32).mul_(scale)
+            for s in starts
+        ]
+        windows = torch.stack(clips).permute(0, 2, 3, 4, 1)   # [B, H, W, D, T]
+        return windows, starts
 
     # legacy per-frame format
     frame_files = [f for f in os.listdir(subject_path)
@@ -196,15 +295,21 @@ def _load_single_subject(subject_path, sequence_length, stride_within_seq=1):
     num_frames = len(frame_files)
     if num_frames == 0:
         raise FileNotFoundError(f"No data.pt and no frame_*.pt found in {subject_path}")
-    if num_frames < need:
-        raise ValueError(f"Not enough frames: found {num_frames}, need at least {need}")
-    parts = []
-    for i in range(0, need, stride_within_seq):
-        frame = torch.load(os.path.join(subject_path, f"frame_{i}.pt"),
-                           weights_only=True).to(torch.float32)
-        parts.append(frame)
-    clip = torch.cat(parts, dim=3)       # [H, W, D, T]
-    return clip.unsqueeze(0)             # [1, H, W, D, T]
+    starts = _window_starts(num_frames, sample_duration, window_step, max_windows)
+
+    frame_cache = {}
+    clips = []
+    for s in starts:
+        parts = []
+        for i in range(s, s + sample_duration, stride_within_seq):
+            if i not in frame_cache:
+                frame_cache[i] = torch.load(
+                    os.path.join(subject_path, f"frame_{i}.pt"), weights_only=True
+                )
+            parts.append(frame_cache[i].to(torch.float32))
+        clips.append(torch.cat(parts, dim=3))                 # [H, W, D, T]
+    windows = torch.stack(clips)                              # [B, H, W, D, T]
+    return windows, starts
 
 
 # ---------------------------------------------------------------------------
@@ -224,16 +329,22 @@ def run_single(args):
 
     sequence_length = args.sequence_length or base_hparams.get("sequence_length", 20)
     stride_within_seq = args.stride_within_seq or base_hparams.get("stride_within_seq", 1)
+    stride_between_seq = args.stride_between_seq or base_hparams.get("stride_between_seq", 20)
     img_size = base_hparams.get("img_size", [96, 96, 96, 20])
 
     print(f"Loading fMRI data from {args.fmri_path}...")
-    volume = _load_single_subject(args.fmri_path, sequence_length, stride_within_seq)
-    volume = pad_to_96(volume)
-    volume = resize_volume(volume, img_size)
-    volume = volume.unsqueeze(1)  # [B, C=1, H, W, D, T]
+    windows, starts = _load_subject_windows(
+        args.fmri_path, sequence_length, stride_within_seq,
+        stride_between_seq, max_windows=args.max_windows,
+    )
+    print(f"Whole-scan inference: {len(starts)} windows "
+          f"(window length {sequence_length * stride_within_seq} frames, "
+          f"step {max(round(stride_between_seq * sequence_length * stride_within_seq), 1)} frames)")
+    windows = pad_to_96(windows)
+    windows = resize_volume(windows, img_size)
+    windows = windows.unsqueeze(1)  # [B, C=1, H, W, D, T]
 
     device = torch.device(args.device)
-    volume = volume.to(device)
 
     print("Loading model...")
     model = LightningModel.load_from_checkpoint(
@@ -243,57 +354,91 @@ def run_single(args):
     model.eval()
 
     print(f"Running inference for task: {args.task}...")
+    batch_size = max(int(args.window_batch_size), 1)
+    outputs = []
     with torch.no_grad():
-        if args.task == "retrieval":
-            feature = model.model(volume)
-            if isinstance(feature, tuple):
-                feature = feature[0]
+        for start in range(0, windows.shape[0], batch_size):
+            batch = windows[start:start + batch_size].to(device)
+            if args.task == "retrieval":
+                feature = model.model(batch)
+                if isinstance(feature, tuple):
+                    feature = feature[0]
 
-            embedding = None
-            if hasattr(model.output_head, "forward_with_features"):
-                _, embedding = model.output_head.forward_with_features(feature)
-            if embedding is None:
-                embedding = feature.flatten(start_dim=2).mean(dim=2)
-            embedding = F.normalize(embedding, p=2, dim=1)
+                embedding = None
+                if hasattr(model.output_head, "forward_with_features"):
+                    _, embedding = model.output_head.forward_with_features(feature)
+                if embedding is None:
+                    embedding = feature.flatten(start_dim=2).mean(dim=2)
+                outputs.append(F.normalize(embedding, p=2, dim=1).cpu())
+            else:
+                outputs.append(model(batch).cpu())
 
-            print("\n" + "=" * 50)
-            print("RESULTS")
-            print("=" * 50)
-            print("Task: retrieval")
-            print(f"Embedding shape: {tuple(embedding.shape)}")
-            print(f"L2 norm: {embedding.norm(dim=1).item():.4f}")
-            print(f"Embedding: {embedding[0].cpu().numpy()}")
-            print("=" * 50 + "\n")
-            return
+    if args.task == "retrieval":
+        # Subject-level embedding: mean of per-window embeddings, re-normalized.
+        embedding = F.normalize(torch.cat(outputs).mean(dim=0, keepdim=True), p=2, dim=1)
 
-        output = model(volume)
+        print("\n" + "=" * 50)
+        print("RESULTS")
+        print("=" * 50)
+        print("Task: retrieval")
+        print(f"Windows averaged: {len(starts)}")
+        print(f"Embedding shape: {tuple(embedding.shape)}")
+        print(f"L2 norm: {embedding.norm(dim=1).item():.4f}")
+        print(f"Embedding: {embedding[0].numpy()}")
+        print("=" * 50 + "\n")
+        return
 
-        if task_cfg["downstream_task_type"] == "classification":
-            probs = _classification_probabilities(output, task_cfg["num_classes"])
-            pred_class = torch.argmax(probs).item()
-            confidence = probs[pred_class].item()
+    # Subject-level prediction: average window logits/values, matching the
+    # subject aggregation of the full evaluation pipeline.
+    output = torch.cat(outputs).mean(dim=0, keepdim=True)
 
-            print("\n" + "=" * 50)
-            print("RESULTS")
-            print("=" * 50)
-            print(f"Task: {args.task}")
-            print(f"Predicted class: {pred_class}")
-            print(f"Confidence: {confidence:.4f}")
-            print(f"All probabilities: {probs.cpu().numpy()}")
-            class_name = _class_name(args.task, pred_class, base_hparams)
-            if class_name is not None:
-                print(f"Predicted label: {class_name}")
-        else:
-            pred_value = output.item()
+    if task_cfg["downstream_task_type"] == "classification":
+        probs = _classification_probabilities(output, task_cfg["num_classes"])
+        pred_class = torch.argmax(probs).item()
+        confidence = probs[pred_class].item()
 
-            print("\n" + "=" * 50)
-            print("RESULTS")
-            print("=" * 50)
-            print(f"Task: {args.task}")
-            print(f"Predicted value: {pred_value:.4f}")
+        print("\n" + "=" * 50)
+        print("RESULTS")
+        print("=" * 50)
+        print(f"Task: {args.task}")
+        print(f"Windows averaged: {len(starts)}")
+        print(f"Predicted class: {pred_class}")
+        print(f"Confidence: {confidence:.4f}")
+        print(f"All probabilities: {probs.numpy()}")
+        class_name = _class_name(args.task, pred_class, base_hparams)
+        if class_name is not None:
+            print(f"Predicted label: {class_name}")
+    else:
+        raw_value = output.item()
+        stats_entry = _label_stats(args, base_hparams, task_cfg)
+        pred_value = _inverse_transform(raw_value, stats_entry) if stats_entry else None
+
+        print("\n" + "=" * 50)
+        print("RESULTS")
+        print("=" * 50)
+        print(f"Task: {args.task}")
+        print(f"Windows averaged: {len(starts)}")
+        if stats_entry is not None and stats_entry[1] is not None:
+            method, stats, source = stats_entry
+            print(f"Raw model output ({method}-scaled): {raw_value:.4f}")
+            if method == "standardization":
+                print(f"Inverse standardized with mean={stats[0]:.4f}, std={stats[1]:.4f} [{source}]")
+            else:
+                print(f"Inverse minmax with min={stats[0]:.4f}, max={stats[1]:.4f} [{source}]")
             if args.task == "age":
                 print(f"Predicted age: {pred_value:.1f} years")
-
+            else:
+                print(f"Predicted value: {pred_value:.4f} (original label scale)")
+        else:
+            method = stats_entry[0] if stats_entry else task_cfg.get("label_scaling_method")
+            print(f"Raw model output ({method}-scaled): {raw_value:.4f}")
+            print("NOTE: this checkpoint was trained with label normalization and the")
+            print("      scaler statistics are not stored in the checkpoint, so the value")
+            print("      above is NOT on the original label scale.")
+            print("      Standardization: label = output * std + mean")
+            print("      Provide --label_mean/--label_std (or --label_min/--label_max for")
+            print("      minmax) to convert, e.g. the released HCP-YA age checkpoint uses")
+            print("      mean=28.7593, std=3.6815.")
     print("=" * 50 + "\n")
 
 
@@ -377,6 +522,23 @@ def parse_args():
                         help="Sequence length (defaults to checkpoint value)")
     single.add_argument("--stride_within_seq", type=int, default=None,
                         help="Stride within sequence (defaults to checkpoint value)")
+    single.add_argument("--stride_between_seq", type=int, default=None,
+                        help="Spacing between evaluation windows, in units of the window "
+                             "length (defaults to checkpoint value); windows cover the whole scan")
+    single.add_argument("--max_windows", type=int, default=None,
+                        help="Cap the number of windows (default: use the whole scan)")
+    single.add_argument("--window_batch_size", type=int, default=8,
+                        help="Windows per forward pass (single mode only)")
+    single.add_argument("--label_mean", type=float, default=None,
+                        help="Train-set label mean for inverse standardization "
+                             "(overrides checkpoint/released defaults)")
+    single.add_argument("--label_std", type=float, default=None,
+                        help="Train-set label std for inverse standardization "
+                             "(overrides checkpoint/released defaults)")
+    single.add_argument("--label_min", type=float, default=None,
+                        help="Train-set label min for inverse minmax scaling")
+    single.add_argument("--label_max", type=float, default=None,
+                        help="Train-set label max for inverse minmax scaling")
 
     # --- dataset mode ---
     ds = parser.add_argument_group("dataset mode")

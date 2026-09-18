@@ -110,10 +110,17 @@ assume the downloaded `task*` folders are stored under `./checkpoints`.
 Released downstream weights currently cover Tasks 1-3. The Task 4 retrieval
 and Task 5 state examples require compatible user-trained checkpoints.
 
-Single-subject regression returns the model-scale value. For checkpoints
-trained with label standardization, use dataset mode when original-unit metrics
-are required because the released checkpoints do not store the training-label
-scaler.
+Single-subject inference runs the model over all windows of the scan (with the
+same window spacing as the training/evaluation pipeline) and averages the window
+outputs into a subject-level prediction. For regression checkpoints trained with
+label standardization (such as the released Task 1 age checkpoint), the printed
+prediction is automatically inverse-transformed to the original label scale, and
+the raw standardized output is shown alongside it. The released age checkpoint
+uses its train-split statistics (mean = 28.7593 years, std = 3.6815 years),
+which are built into the demo. For checkpoints you fine-tune yourself, pass
+`--label_mean`/`--label_std` (or `--label_min`/`--label_max` for minmax scaling)
+computed from your own training split; without them the demo prints the raw
+standardized value with a warning instead of a converted label.
 
 ### 2.1 Single File Inference
 

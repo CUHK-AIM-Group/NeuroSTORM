@@ -30,6 +30,7 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 We welcome community contributions! Feel free to submit a PR to add support for your model or dataset.
 
 ## 🚀 Updates
+* __[2026.09.19]__: `demo.py` single-subject inference now averages all windows of the whole scan (instead of only the first clip), and regression predictions are automatically inverse-standardized to the original label units (e.g. years for age).
 * __[2026.05.14]__: Added Task-specific Prompt Tuning (`--tpt_strategy prompt --prompt_len 50`) for NeuroSTORM downstream adaptation; switched volume preprocessing to int8 quantization with a single `data.pt` per subject (mmap-based partial reads).
 * __[2026.05.08]__: Added BrainGNN, BNT, LG-GNN, Com-BrainTF, BrainNetCNN and IBGNN support. Framework now supports voxel (4D), ROI (2D), and FC (2D) inputs.
 * __[2026.03.24]__: Our paper has been accepted by [Nature Biomedical Engineering](https://www.nature.com/articles/s41551-026-01666-y).
@@ -173,8 +174,12 @@ python demo.py \
 `demo.py` covers all five benchmark categories. Its task choices are `age`,
 `gender`, `phenotype`, `diagnosis`, `retrieval`, and `state` (Task 1 has both
 age and gender targets). It supports single-subject inference and full-dataset
-evaluation. See [USER_GUIDE.md](USER_GUIDE.md#2-quick-start--demo) for complete
-examples.
+evaluation. Single-subject inference averages all windows of the scan, and
+regression predictions are printed in the original label units (e.g. years for
+age): the demo automatically inverts the label standardization used during
+training, using built-in train-split statistics for the released checkpoints or
+`--label_mean`/`--label_std` for your own fine-tuned checkpoints. See
+[USER_GUIDE.md](USER_GUIDE.md#2-quick-start--demo) for complete examples.
 
 **For detailed usage, data preparation, and advanced options, see [USER_GUIDE.md](USER_GUIDE.md).**
 
