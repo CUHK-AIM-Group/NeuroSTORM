@@ -252,6 +252,8 @@ def _window_starts(num_frames, sample_duration, window_step, max_windows=None):
     starts = list(range(0, num_frames - sample_duration + 1, window_step))
     if max_windows is not None:
         starts = starts[:max_windows]
+    if not starts:
+        raise ValueError("No evaluation windows selected (check --max_windows)")
     return starts
 
 
@@ -340,7 +342,9 @@ def run_single(args):
     print(f"Whole-scan inference: {len(starts)} windows "
           f"(window length {sequence_length * stride_within_seq} frames, "
           f"step {max(round(stride_between_seq * sequence_length * stride_within_seq), 1)} frames)")
-    windows = pad_to_96(windows)
+    # Pad each window individually: the evaluation Dataset pads per sample and
+    # pad_to_96 takes the background value from the tensor's first element.
+    windows = torch.cat([pad_to_96(w.unsqueeze(0)) for w in windows], dim=0)
     windows = resize_volume(windows, img_size)
     windows = windows.unsqueeze(1)  # [B, C=1, H, W, D, T]
 
@@ -368,10 +372,15 @@ def run_single(args):
                 if hasattr(model.output_head, "forward_with_features"):
                     _, embedding = model.output_head.forward_with_features(feature)
                 if embedding is None:
-                    embedding = feature.flatten(start_dim=2).mean(dim=2)
+                    embedding = feature
+                    if embedding.dim() > 2:
+                        embedding = embedding.flatten(start_dim=2).mean(dim=2)
                 outputs.append(F.normalize(embedding, p=2, dim=1).cpu())
             else:
-                outputs.append(model(batch).cpu())
+                out = model(batch)
+                if isinstance(out, tuple):  # some heads return (logits, aux)
+                    out = out[0]
+                outputs.append(out.cpu())
 
     if args.task == "retrieval":
         # Subject-level embedding: mean of per-window embeddings, re-normalized.
