@@ -24,6 +24,7 @@ nilearn
 # Scientific computing
 numpy
 scipy
+matplotlib
 pandas
 scikit-learn
 
@@ -33,12 +34,15 @@ torch-geometric
 #   pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 
 # Data processing
+h5py
+PyYAML
+einops
 
 # Development tools
 ipdb
 
 # Transformers (pinned for mamba-ssm 2.2.2 compatibility)
-transformers<=4.39.3
+transformers==4.39.3
 
 # Note: mamba-ssm and causal-conv1d need to be installed from source
 # See README.md for installation instructions

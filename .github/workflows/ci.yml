@@ -41,7 +41,7 @@ jobs:
         pip install pytest pytest-cov
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         pip install pytorch-lightning==1.9.4
-        pip install numpy scipy pandas scikit-learn
+        pip install numpy scipy pandas scikit-learn matplotlib h5py PyYAML
         pip install nibabel nilearn monai
         pip install einops
 

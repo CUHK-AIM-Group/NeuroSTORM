@@ -1,0 +1,6 @@
+image_root: /path/to/hcpya_preprocessed/img
+fc_root: /path/to/data_cache/fc/cc200/correlation
+roi_root: /path/to/data_cache/roi/a424
+brainlm_stats: assets/brainlm_stats.npz
+protocol: fixed400.json
+scan_manifest: scans.json

@@ -157,7 +157,7 @@ class TransPoolingEncoder(nn.Module):
 
     def __init__(self, input_feature_size, input_node_num, hidden_size,
                  output_node_num, pooling=True, orthogonal=True,
-                 freeze_center=False, project_assignment=True):
+                 freeze_center=False, project_assignment=True, encoder_hidden_size=32):
         super().__init__()
 
         nhead = 4 if input_feature_size % 4 == 0 else (2 if input_feature_size % 2 == 0 else 1)
@@ -170,7 +170,6 @@ class TransPoolingEncoder(nn.Module):
 
         self.pooling = pooling
         if pooling:
-            encoder_hidden_size = 32
             self.encoder = nn.Sequential(
                 nn.Linear(input_feature_size * input_node_num, encoder_hidden_size),
                 nn.LeakyReLU(),
@@ -229,6 +228,7 @@ class BrainNetworkTransformer(nn.Module):
         freeze_center=False,
         project_assignment=True,
         dropout=0.1,
+        encoder_hidden_size=32,
         **kwargs
     ):
         """
@@ -276,7 +276,8 @@ class BrainNetworkTransformer(nn.Module):
                     pooling=do_pooling[i],
                     orthogonal=orthogonal,
                     freeze_center=freeze_center,
-                    project_assignment=project_assignment
+                    project_assignment=project_assignment,
+                    encoder_hidden_size=encoder_hidden_size
                 )
             )
 
