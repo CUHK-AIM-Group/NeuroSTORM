@@ -128,8 +128,10 @@ def cli_main():
 
     if args.model == "neurostorm":
         category_dir = "neurostorm"
-    elif args.model in ["swift", "tff"]:
+    elif args.model in ["swift", "tff", "band"]:
         category_dir = "volume-based"
+    elif args.model in ("brainjepa", "brainlm"):
+        category_dir = "roi-based"
     elif args.model in ["braingnn", "lggnn", "ibgnn"]:
         category_dir = "graph-based"
     elif args.model in ["bnt", "combraintf", "brainnetcnn"]:
@@ -317,6 +319,8 @@ def cli_main():
             print(f'loading model from {args.load_model_path}')
             path = args.load_model_path
         else:
+            if args.model in ('brainjepa', 'band', 'brainlm', 'tff'):
+                raise FileNotFoundError(f"Provide a local framework checkpoint: {args.load_model_path}")
             print('cannot find the ckpt file. try to download model from huggingface')
             repo_id = "zxcvb20001/NeuroSTORM"
             if args.model == 'neurostorm':
@@ -330,12 +334,12 @@ def cli_main():
                 print('train from scratch')
     
     if path is not None:
-        ckpt = torch.load(path)
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
         new_state_dict = OrderedDict()
         for k, v in ckpt['state_dict'].items():
             if 'model.' in k: #transformer-related layers
                 new_state_dict[k.removeprefix("model.")] = v
-        model.model.load_state_dict(new_state_dict, strict=False)
+        model.model.load_state_dict(new_state_dict, strict=args.model in ('brainjepa', 'band', 'brainlm', 'tff'))
 
     if getattr(args, 'use_strd', False):
         if args.use_mae and args.model == 'neurostorm':

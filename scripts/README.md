@@ -69,6 +69,36 @@ bash scripts/run_experiment.sh --model <model> --dataset <dataset[,dataset...]> 
 | `combraintf` | FC           | `configs/models/combraintf.yaml` |
 | `ibgnn`      | Graph        | `configs/models/ibgnn.yaml`      |
 | `brainnetcnn`| FC (CNN)     | `configs/models/brainnetcnn.yaml`|
+| `brainjepa`  | ROI time series | `configs/models/brainjepa.yaml` |
+| `band`       | Voxel (CNN + Transformer) | `configs/models/band.yaml` |
+
+Brain-JEPA and BAnD use the same model registry, Lightning training loop,
+validation, testing and checkpoint options as the other supervised models.
+They support binary/multiclass classification and scalar regression. BAnD's
+regression option replaces its classification output with a scalar task head.
+Their configuration files apply to supervised training; the generic NeuroSTORM
+MAE/contrastive pretraining mode does not implement their pretraining objectives.
+
+```bash
+# BAnD: existing preprocessed voxel inputs and seven-state labels
+bash scripts/run_experiment.sh --model band --dataset hcptask --task task5 --mode train_scratch
+
+# Brain-JEPA: original target_encoder initializer and ordered 450-ROI signals
+bash scripts/run_experiment.sh --model brainjepa --dataset hcp1200 --task task1_age --mode finetune -- \
+  --brainjepa_checkpoint_path /path/to/brainjepa_pretrained.pth.tar
+
+# Restore a trained framework checkpoint without its original initializer
+bash scripts/run_experiment.sh --model brainjepa --dataset hcp1200 --task task1_age --mode test -- \
+  --test_ckpt_path /path/to/trained.ckpt
+```
+
+For Brain-JEPA, put `[450,T]` arrays at
+`<image_path>/roi/brainjepa450/<subject>_brainjepa450.npy`, using the ROI order
+of the bundled gradient table. The normalizer operates on the complete scan,
+then samples 160 points from a 480-frame crop (random for training, centered
+for evaluation). Files shorter than the configured crop or with another ROI
+count are rejected. See [Brain-JEPA input details](../models/brainjepa/README.md).
+The fixed Task4 ReID evaluation remains its existing eight-checkpoint protocol.
 
 ## Available Datasets
 
@@ -171,6 +201,97 @@ python demo.py \
   --fmri_path ./data/abide_preprocessed/img/subject_id \
   --task diagnosis
 ```
+
+### Quick ReID evaluation
+
+The [ReID entry point](task4/evaluate_reid.py) evaluates the eight released checkpoints
+using the saved HCP-YA query/gallery lists. Run the following commands from the
+repository root. Install the project environment (including Mamba for NeuroSTORM)
+and the repository dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Download the eight Task4 `.ckpt` files into a checkpoint directory:
+
+| Model | Checkpoint filename |
+| --- | --- |
+| NeuroSTORM | `neurostorm_hcpya_fmri_reid.ckpt` |
+| SwiFT | `swift_hcpya_fmri_reid.ckpt` |
+| TFF | `tff_hcpya_fmri_reid.ckpt` |
+| BrainLM | `brainlm_hcpya_fmri_reid.ckpt` |
+| Com-brainTF | `combraintf_hcpya_fmri_reid.ckpt` |
+| LG-GNN | `lggnn_hcpya_fmri_reid.ckpt` |
+| BNT | `bnt_hcpya_fmri_reid.ckpt` |
+| BrainGNN | `braingnn_hcpya_fmri_reid.ckpt` |
+
+The evaluation script also accepts the local bundle filenames, such as
+`NeuroSTORM.ckpt`, for existing downloads.
+
+Configure [`scripts/configs/reid/hcpya.yaml`](configs/reid/hcpya.yaml) with the paths
+to your preprocessed data:
+
+| Configuration key | Input layout |
+| --- | --- |
+| `image_root` | `<subject>/<scan>/data.h5`; `frames` has shape `[T,91,96,91]`, with a `scale` attribute for scaled integer data |
+| `fc_root` | `<subject>/<scan>.npy`; CC200 correlation matrices of shape `[190,190]` |
+| `roi_root` | `<subject>/<scan>.npy`; A424 time series of shape `[424,T]` |
+
+Use the same preprocessed scans as the released evaluation split. Paths are
+resolved relative to the configuration file. Update the data-root paths and
+leave the remaining configuration unchanged. ReID performance is reported on
+**400 scans** across five saved trials. Each query has one or two relevant
+gallery scans, as specified by the saved protocol. Top-1 and mAP are the means
+of the five trials.
+
+Gallery scans are ranked by descending cosine similarity. The $R_q$ gallery
+scans from the query's subject are relevant. If their one-based ranks are
+$r_1 < \cdots < r_{R_q}$:
+
+$$
+\mathrm{AP}(q) = \frac{1}{R_q}\sum_{i=1}^{R_q}\frac{i}{r_i}.
+$$
+
+For the query set $Q_t$ in trial $t$, mAP is the mean query AP. The reported
+score averages the five trial mAP values (multiply by 100 for a percentage):
+
+$$
+\mathrm{mAP}_t = \frac{1}{|Q_t|}\sum_{q \in Q_t}\mathrm{AP}(q),
+\qquad
+\mathrm{mAP} = \frac{1}{5}\sum_{t=1}^{5}\mathrm{mAP}_t.
+$$
+
+```bash
+python scripts/task4/evaluate_reid.py \
+  --checkpoint-dir /path/to/checkpoints/reid \
+  --data-config scripts/configs/reid/hcpya.yaml \
+  --models all --split test --device cuda \
+  --output-dir results/reid
+```
+
+Use `--models NeuroSTORM SwiFT TFF BrainLM Com-brainTF LG-GNN BNT BrainGNN`
+to select models, or pass one model name. Use a new output directory for each run.
+The entry point reads the input data and performs fresh inference. It prints
+Top-1 and mAP and saves one ranking list per model, such as `BrainGNN.txt`.
+`--check-only` checks strict checkpoint loading without running the data evaluation.
+
+Generate the points view from the Source Data workbook, or the violin view from the ranking lists:
+
+```bash
+python scripts/task4/plot_fig5.py \
+  --mode points --source /path/to/41551_2026_1666_MOESM6_ESM.xlsx \
+  --output-dir results/fig5
+
+python scripts/task4/plot_fig5.py \
+  --mode violin \
+  --ranking-dir /path/to/ranking_lists \
+  --output-dir results/fig5
+```
+
+The [plotting script](task4/plot_fig5.py) reads the five rows in the workbook's `Top1`
+and `map` sheets for points mode. Violin mode computes query scores from the ranking
+lists. The outputs are `Fig5_points.*` and `Fig5_violin.*` in PNG, PDF, and SVG format.
 
 ## Configuration Structure
 

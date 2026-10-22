@@ -6,12 +6,12 @@
     <title>NeuroSTORM</title>
     <meta
       name="description"
-      content="NeuroSTORM: A comprehensive deep learning platform for preprocessing, model training, and downstream analysis of fMRI data across multiple datasets."
+      content="NeuroSTORM: fMRI analysis with 12 models, 15 datasets, shared supervised training, and 5 downstream task categories."
     />
     <meta property="og:title" content="NeuroSTORM" />
     <meta
       property="og:description"
-      content="A deep learning platform for fMRI analysis: preprocessing, model training, and downstream tasks."
+      content="Explore 12 fMRI models, 15 datasets, and shared training and retrieval workflows."
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://img.picui.cn/free/2025/06/10/6848379069d65.png" />
@@ -91,7 +91,7 @@
         font-size: 0.95rem;
       }
 
-      nav a:hover {
+      nav a:hover, nav a.active {
         color: var(--primary);
       }
 
@@ -370,8 +370,9 @@
         />
         <span>NeuroSTORM</span>
       </a>
-      <nav>
-        <a href="index.html">Home</a>
+      <nav aria-label="Main navigation">
+        <a href="index.html" class="active" aria-current="page">Home</a>
+        <a href="models.html">Models</a>
         <a href="datasets.html">Datasets</a>
         <a href="tasks.html">Tasks</a>
         <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank">GitHub</a>
@@ -387,7 +388,7 @@
           Preprocessing, Training, and <span>Downstream Analysis</span>
         </h1>
         <p class="lead">
-          NeuroSTORM provides end-to-end tools for fMRI preprocessing, self-supervised model training, and downstream analysis tasks across multiple public neuroimaging datasets.
+          NeuroSTORM provides tools for fMRI preprocessing, self-supervised pretraining, supervised learning, and downstream analysis. Explore 12 models through a shared supervised training workflow and 15 datasets, including ABIDE I and ABIDE II.
         </p>
         <div class="institutions-logos" aria-label="Institutions">
           <button class="institution-logo" type="button" aria-label="CUHK">
@@ -404,20 +405,20 @@
         </div>
         <div class="metrics">
           <article>
-            <h3>18+</h3>
-            <p>Supported Datasets</p>
+            <h3>12</h3>
+            <p>Model Architectures</p>
           </article>
           <article>
             <h3>5</h3>
             <p>Task Categories</p>
           </article>
           <article>
-            <h3>Contrastive & MAE</h3>
-            <p>Self-Supervised Pre-training</p>
+            <h3>4</h3>
+            <p>Input Formats</p>
           </article>
           <article>
-            <h3>ROI & Volume</h3>
-            <p>Analysis Modes</p>
+            <h3>15</h3>
+            <p>Datasets</p>
           </article>
         </div>
       </section>
@@ -439,11 +440,11 @@
           </article>
           <article>
             <h3>🔧 Flexible Model Architecture</h3>
-            <p>Customizable deep learning models with configurable heads for classification, regression, and embedding tasks.</p>
+            <p>Twelve supervised backbones through a common training workflow, including Brain-JEPA, BAnD, BrainLM, and TFF.</p>
           </article>
           <article>
             <h3>📚 Comprehensive Datasets</h3>
-            <p>Ready-to-use preprocessing pipelines and data loaders for UKB, HCP, ABCD, ADHD200, and more.</p>
+            <p>Fifteen datasets, including HCP cohorts, UK Biobank, ABCD, ABIDE I and II, and clinical and task-fMRI datasets.</p>
           </article>
           <article>
             <h3>✅ Downstream Task Suite</h3>
@@ -454,11 +455,13 @@
 
 
 
+
       <section class="cta reveal">
         <h2>Explore More</h2>
-        <p>Browse our datasets, tasks, and documentation to get started with NeuroSTORM.</p>
+        <p>Browse our models, datasets, tasks, and documentation to get started with NeuroSTORM.</p>
         <div class="actions">
-          <a class="btn" href="datasets.html">View Datasets</a>
+          <a class="btn" href="models.html">View Models</a>
+          <a class="btn ghost" href="datasets.html">View Datasets</a>
           <a class="btn ghost" href="tasks.html">View Tasks</a>
         </div>
       </section>

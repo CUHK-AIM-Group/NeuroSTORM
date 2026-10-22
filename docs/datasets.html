@@ -6,12 +6,12 @@
     <title>NeuroSTORM | Supported Datasets</title>
     <meta
       name="description"
-      content="NeuroSTORM supported neuroimaging datasets: 18+ publicly available fMRI datasets for pre-training and downstream analysis."
+      content="NeuroSTORM supports 15 datasets, including ABIDE I and ABIDE II, with configurable model inputs and tasks."
     />
     <meta property="og:title" content="NeuroSTORM - Datasets" />
     <meta
       property="og:description"
-      content="Explore 18+ supported fMRI datasets in NeuroSTORM including UKB, HCP, ABCD, and more."
+      content="Find the dataset identifiers, available experiment configurations, and task presets for NeuroSTORM."
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://img.picui.cn/free/2025/06/10/6848379069d65.png" />
@@ -167,6 +167,15 @@
         max-width: 800px;
       }
 
+      .table-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      .table-scroll table {
+        min-width: 650px;
+      }
+
       table {
         width: 100%;
         border-collapse: collapse;
@@ -265,9 +274,10 @@
         <img src="static/images/icon.png" alt="NeuroSTORM logo" />
         <span>NeuroSTORM</span>
       </a>
-      <nav>
+      <nav aria-label="Main navigation">
         <a href="index.html">Home</a>
-        <a href="datasets.html" class="active">Datasets</a>
+        <a href="models.html">Models</a>
+        <a href="datasets.html" class="active" aria-current="page">Datasets</a>
         <a href="tasks.html">Tasks</a>
         <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank">GitHub</a>
       </nav>
@@ -279,10 +289,52 @@
     <main>
       <h1>Supported Datasets</h1>
       <p class="lead">
-        NeuroSTORM supports a wide range of publicly available fMRI datasets for both pre-training and downstream analysis. Below is a comprehensive overview of 18+ datasets with details on subjects, resolution, TR, and scientific focus.
+        NeuroSTORM supports 15 datasets, including ABIDE I and ABIDE II. Choose the dataset and its prepared input representation for your experiment.
       </p>
 
-      <h2>Dataset Overview Table</h2>
+      <h2 id="dataset-support">Current Software Support</h2>
+      <p>
+        Use the exact identifier with <code>main.py --dataset_name</code>, or
+        the linked configuration name with <code>run_experiment.sh --dataset</code>.
+        ABIDE I and ABIDE II use <code>ABIDE</code> with their corresponding
+        prepared data roots.
+      </p>
+      <div class="table-scroll">
+      <table id="dataset-support-table">
+        <thead><tr><th>Dataset</th><th>Dataset identifier</th><th>Runner configuration</th><th>Tasks / labels</th></tr></thead>
+        <tbody>
+            <tr><td>HCP-YA</td><td><code>HCP1200</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/hcp1200.yaml"><code>hcp1200</code></a></td><td>Sex, age, phenotype prediction</td></tr>
+            <tr><td>HCP-A</td><td><code>HCPA</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/hcpa.yaml"><code>hcpa</code></a></td><td>Pretraining preset</td></tr>
+            <tr><td>HCP-D</td><td><code>HCPD</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/hcpd.yaml"><code>hcpd</code></a></td><td>Pretraining preset</td></tr>
+            <tr><td>ABCD</td><td><code>ABCD</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/abcd.yaml"><code>abcd</code></a></td><td>Pretraining preset</td></tr>
+            <tr><td>UK Biobank</td><td><code>UKB</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/ukb.yaml"><code>ukb</code></a></td><td>Pretraining preset</td></tr>
+            <tr><td>ADHD-200</td><td><code>ADHD200</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/adhd200.yaml"><code>adhd200</code></a></td><td>Diagnosis</td></tr>
+            <tr><td>ABIDE I</td><td><code>ABIDE</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/abide.yaml"><code>abide</code></a></td><td>Diagnosis</td></tr>
+            <tr><td>ABIDE II</td><td><code>ABIDE</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/abide.yaml"><code>abide</code></a></td><td>Diagnosis</td></tr>
+            <tr><td>COBRE</td><td><code>Cobre</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/cobre.yaml"><code>cobre</code></a></td><td>Diagnosis</td></tr>
+            <tr><td>UCLA</td><td><code>UCLA</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/ucla.yaml"><code>ucla</code></a></td><td>Diagnosis</td></tr>
+            <tr><td>Transdiagnostic data</td><td><code>TransDiag</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/transdiag.yaml"><code>transdiag</code></a></td><td>Phenotype prediction, diagnosis</td></tr>
+            <tr><td>HCP task-fMRI</td><td><code>HCPTASK</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/hcptask.yaml"><code>hcptask</code></a></td><td>Seven-state classification</td></tr>
+            <tr><td>Movie/group data</td><td><code>MOVIE</code></td><td><a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/configs/datasets/movie.yaml"><code>movie</code></a></td><td>Metadata-defined classification</td></tr>
+            <tr><td>HCP-EP</td><td><code>HCPEP</code></td><td>Custom configuration</td><td>Sex, age, diagnosis</td></tr>
+            <tr><td>GOD</td><td><code>GOD</code></td><td>Custom configuration</td><td>Visual object categories</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>
+        Each experiment needs matching metadata and the selected model's voxel, ROI, FC, or graph
+        inputs. See <a href="models.html">model support</a> and the
+        <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/README.md#available-datasets">dataset configuration reference</a>.
+      </p>
+
+      <h2>Dataset Reference Catalog</h2>
+      <p>
+        The following catalog and descriptions provide research background.
+        Use the software support table above to select an available entry point;
+        additional catalog datasets need a custom data and metadata adapter.
+        Reported cohort sizes vary with the release and preprocessing subset.
+      </p>
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -344,7 +396,7 @@
             <td><a href="http://fcon_1000.projects.nitrc.org/indi/adhd200/" target="_blank">Link</a></td>
           </tr>
           <tr>
-            <td><b>Autism Brain Imaging Data Exchange (ABIDE)</b></td>
+            <td><b>Autism Brain Imaging Data Exchange I (ABIDE I)</b></td>
             <td>1,112 (948 / 164)</td>
             <td>3 × 3 × 3 mm³</td>
             <td>2000</td>
@@ -408,8 +460,9 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
-      <h2>Detailed Dataset Descriptions</h2>
+      <h2>Research Dataset Background</h2>
 
       <details>
         <summary><b>UK Biobank (UKB):</b> Large-scale population study with 35,458 subjects</summary>
@@ -447,7 +500,7 @@
       </details>
 
       <details>
-        <summary><b>Autism Brain Imaging Data Exchange (ABIDE):</b> 1,112 ASD subjects across 17 sites</summary>
+        <summary><b>Autism Brain Imaging Data Exchange I (ABIDE I):</b> 1,112 participants across 17 sites</summary>
         <p>
           ABIDE collates resting-state fMRI and anatomical MRI from 1,112 subjects (539 with Autism Spectrum Disorder, 573 controls), ages 7–64, across 17 international sites. Imaging protocols are heterogeneous (typical: 3mm³, TR=2s). Extensive phenotypic/clinical data are included, covering ASD diagnosis, IQ, and behavioral scales. Preprocessing (multiple pipelines) includes normalization, head motion correction, nuisance regression, registration, and ROI-based time series extraction. ABIDE is a benchmark for autism connectomics and machine learning-based disorder classification.
         </p>

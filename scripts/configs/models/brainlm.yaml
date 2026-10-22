@@ -1,0 +1,20 @@
+model: brainlm
+data_type: roi
+atlas_name: brainlm424
+optimizer: AdamW
+learning_rate: 0.0001
+max_epochs: 100
+batch_size: 2
+
+model_args:
+  sequence_length: 200
+  brainlm_num_rois: 424
+  brainlm_image_size: 432
+  brainlm_patch_size: 16
+  brainlm_hidden_size: 768
+  brainlm_num_layers: 12
+  brainlm_num_heads: 12
+  brainlm_intermediate_size: 3072
+  brainlm_dropout: 0.1
+  brainlm_readout: cls
+

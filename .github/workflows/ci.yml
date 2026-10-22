@@ -41,9 +41,10 @@ jobs:
         pip install pytest pytest-cov
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         pip install pytorch-lightning==1.9.4
-        pip install numpy scipy pandas scikit-learn
+        pip install numpy scipy pandas scikit-learn matplotlib h5py openpyxl PyYAML
         pip install nibabel nilearn monai
         pip install einops
+        pip install transformers==4.39.3
 
     - name: Install PyTorch Geometric (CPU)
       run: |
@@ -101,6 +102,7 @@ jobs:
         pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
         pip install pytorch-lightning==1.9.4
         pip install numpy scipy einops
+        pip install transformers==4.39.3
         pip install torch-geometric || true
         pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-$(python -c "import torch; print(torch.__version__.split('+')[0])")+cpu.html || true
 

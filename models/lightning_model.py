@@ -69,7 +69,9 @@ class LightningModel(pl.LightningModule):
             import ipdb; ipdb.set_trace()
 
         # Heads
-        if not self.hparams.pretraining:
+        if not self.hparams.pretraining and self.hparams.model in ('brainjepa', 'band', 'brainlm', 'tff'):
+            self.output_head = nn.Identity()  # These models include their task head.
+        elif not self.hparams.pretraining:
             if self.hparams.downstream_task_type == 'classification' or self.hparams.scalability_check:
                 self.output_head = load_model("clf_mlp", self.hparams)
             elif self.hparams.downstream_task_type == 'regression':
@@ -187,6 +189,30 @@ class LightningModel(pl.LightningModule):
         return img
     
     def _compute_logits(self, batch, augment_during_training=None):
+        if self.hparams.model in ('brainjepa', 'band', 'brainlm', 'tff'):
+            roi_input = self.hparams.model in ('brainjepa', 'brainlm')
+            fmri = batch['roi_sequence' if roi_input else 'fmri_sequence']
+            if augment_during_training:
+                if roi_input:
+                    raise ValueError("Voxel spatial augmentation cannot be applied to ROI signals")
+                fmri = self.augment(fmri)
+            features = None
+            if self.hparams.task_name == 'fmri_reid':
+                logits, features = self.model.forward_with_features(fmri)
+            else:
+                logits = self.model(fmri)
+            target = batch['target'].float().reshape(-1)
+            if self.hparams.downstream_task_type == 'classification':
+                if self.hparams.num_classes == 2:
+                    logits = logits.reshape(-1)
+            else:
+                logits = logits.reshape(-1)
+                if self.hparams.label_scaling_method == 'standardization':
+                    target = (target - self.scaler.mean_[0]) / self.scaler.scale_[0]
+                else:
+                    target = (target - self.scaler.data_min_[0]) / (self.scaler.data_max_[0] - self.scaler.data_min_[0])
+            return batch['subject_name'], logits, target, features, None
+
         # Handle PyG graph batch (BrainGNN, LG-GNN, etc.)
         if hasattr(batch, 'edge_index'):
             model_name = getattr(self.hparams, 'model', '')
@@ -367,7 +393,7 @@ class LightningModel(pl.LightningModule):
                     loss = F.binary_cross_entropy_with_logits(logits, target)
                     acc = self.metric.get_accuracy_binary(logits, target.float().squeeze())
                 else:
-                    loss = F.cross_entropy(logits, target.long().squeeze())
+                    loss = F.cross_entropy(logits, target.long().reshape(-1))
                     acc = self.metric.get_accuracy(logits, target.float().squeeze())
 
                 if assignments is not None and hasattr(self.model, 'compute_pooling_loss'):
@@ -544,7 +570,7 @@ class LightningModel(pl.LightningModule):
                 output = torch.stack([logits[1].squeeze(), target], dim=1)
                 output = output.detach().cpu()
             else:
-                output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu(), None if head_features is None else head_features.detach().cpu()]
+                output = self._detach_predictions(logits, target, head_features)
             
             return (subj, output)
 
@@ -636,12 +662,21 @@ class LightningModel(pl.LightningModule):
             with open(os.path.join('predictions',self.hparams.id,'iter_{}.pkl'.format(self.current_epoch)),'wb') as fw:
                 pickle.dump(self.subject_accuracy, fw)
 
+    def _detach_predictions(self, logits, target, head_features):
+        if self.hparams.model in ('brainjepa', 'band', 'brainlm', 'tff'):
+            # Keep the leading batch dimension, including a final batch of one.
+            target = target.reshape(-1)
+        else:
+            logits, target = logits.squeeze(), target.squeeze()
+        return [logits.detach().cpu(), target.detach().cpu(),
+                None if head_features is None else head_features.detach().cpu()]
+
     def test_step(self, batch, batch_idx):
         if self.hparams.pretraining:
             self._calculate_loss(batch, mode="test")
         else:
             subj, logits, target, head_features, _ = self._compute_logits(batch)
-            output = [logits.squeeze().detach().cpu(), target.squeeze().detach().cpu(), None if head_features is None else head_features.detach().cpu()]
+            output = self._detach_predictions(logits, target, head_features)
 
             return (subj, output)
 
@@ -669,7 +704,10 @@ class LightningModel(pl.LightningModule):
                 self._evaluate_metrics(subj_test, total_out_test_logits, total_out_test_target, mode="test")
     
     def on_train_epoch_start(self) -> None:
-        self.starter, self.ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        if self.hparams.scalability_check:
+            if self.device.type != 'cuda':
+                raise ValueError("--scalability_check requires CUDA timing events")
+            self.starter, self.ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
         self.total_time = 0
         self.repetitions = 200
         self.gpu_warmup = 50
@@ -796,6 +834,45 @@ class LightningModel(pl.LightningModule):
         group.add_argument("--clf_head_version", type=str, default="v1", help="clf head version, v2 has a hidden layer")
         group.add_argument("--attn_drop_rate", type=float, default=0, help="dropout rate of attention layers")
         group.add_argument("--reid_gallery_size", type=int, default=None, help="Limit gallery size when evaluating re-identification (use all if unset)")
+
+        # Brain-JEPA and BAnD supervised backbones.
+        group.add_argument("--brainjepa_checkpoint_path", type=str, default=None,
+                           help="Optional original Brain-JEPA target_encoder initializer; omit for scratch or restoring a framework checkpoint")
+        group.add_argument("--brainjepa_gradient_path", type=str, default=None,
+                           help="Optional [450,30] gradient CSV with the input ROI order")
+        group.add_argument("--brainjepa_gradient_checkpointing", type=str2bool, default=True)
+        group.add_argument("--brainjepa_window_length", type=int, default=480,
+                           help="Full-scan normalized ROI crop length before selecting 160 time points")
+        group.add_argument("--band_base_channels", type=int, default=64)
+        group.add_argument("--band_transformer_layers", type=int, default=2)
+        group.add_argument("--band_num_heads", type=int, default=8)
+        group.add_argument("--band_feedforward_dim", type=int, default=2048)
+        group.add_argument("--band_dropout", type=float, default=0.2)
+        group.add_argument("--band_frame_chunk_size", type=int, default=4)
+        group.add_argument("--band_max_sequence_length", type=int, default=40)
+
+        # BrainLM and TFF supervised encoder initialization and architecture.
+        group.add_argument("--brainlm_checkpoint_path", type=str, default=None,
+                           help="Optional local BrainLM encoder initializer; framework restores do not require it")
+        group.add_argument("--brainlm_stats_path", type=str, default=None,
+                           help="Optional training-derived median/IQR/roi_order NPZ; otherwise robust-scale each scan")
+        group.add_argument("--brainlm_num_rois", type=int, default=424)
+        group.add_argument("--brainlm_image_size", type=int, default=432)
+        group.add_argument("--brainlm_patch_size", type=int, default=16)
+        group.add_argument("--brainlm_hidden_size", type=int, default=768)
+        group.add_argument("--brainlm_num_layers", type=int, default=12)
+        group.add_argument("--brainlm_num_heads", type=int, default=12)
+        group.add_argument("--brainlm_intermediate_size", type=int, default=3072)
+        group.add_argument("--brainlm_dropout", type=float, default=0.1)
+        group.add_argument("--brainlm_readout", choices=("cls", "foreground_mean"), default="cls")
+        group.add_argument("--tff_checkpoint_path", type=str, default=None,
+                           help="Optional local TFF CNN/bottleneck/Transformer initializer; decoder and task head are omitted")
+        group.add_argument("--tff_hidden_size", type=int, default=2640)
+        group.add_argument("--tff_num_layers", type=int, default=2)
+        group.add_argument("--tff_num_heads", type=int, default=16)
+        group.add_argument("--tff_intermediate_size", type=int, default=3072)
+        group.add_argument("--tff_max_sequence_length", type=int, default=29,
+                           help="Maximum clip frames; one extra position is reserved for the CLS token")
 
         # Task-specific Parameter-efficient Tuning (NeuroSTORM only)
         group.add_argument("--tpt_strategy", type=str, default="none",

@@ -137,7 +137,7 @@ Usage:
   bash scripts/run_experiment.sh [options]
 
 Required:
-  --model <name>          Model name (neurostorm, swift, braingnn, bnt, lggnn, combraintf, ibgnn, brainnetcnn)
+  --model <name>          Model name (neurostorm, swift, braingnn, bnt, lggnn, combraintf, ibgnn, brainnetcnn, brainjepa, band, brainlm, tff)
   --dataset <name>        Dataset name (hcp1200, hcpa, hcpd, adhd200, cobre, ucla, hcptask, movie, transdiag, abcd, ukb, abide).
                           In --mode pretrain a comma-separated list is accepted (e.g. hcp1200,hcpa,hcpd,abcd,ukb)
                           to jointly pretrain on multiple cohorts. Rejected for non-pretrain modes.
@@ -268,6 +268,10 @@ cfg_max_epochs=$(yaml_get "$MODEL_CONFIG" "max_epochs")
 cfg_batch_size=$(yaml_get "$MODEL_CONFIG" "batch_size")
 cfg_fc_type=$(yaml_get "$MODEL_CONFIG" "fc_type")
 cfg_atlas_name=$(yaml_get "$MODEL_CONFIG" "atlas_name")
+if [[ "$MODE" == "pretrain" && ( "$cfg_model" == "brainjepa" || "$cfg_model" == "band" || "$cfg_model" == "brainlm" || "$cfg_model" == "tff" ) ]]; then
+    echo "Error: $cfg_model supports train_scratch, finetune and test; not NeuroSTORM pretraining."
+    exit 1
+fi
 
 # ============================================================
 # Read dataset config(s) and join dataset_name / image_path with commas
@@ -372,6 +376,13 @@ if [[ "$MODE" != "pretrain" ]]; then
     if [[ -n "$task_split_num" ]]; then
         final_dataset_split_num="$task_split_num"
     fi
+fi
+
+# TFF's positional table limits clip length. Keep its model-specific window
+# when a dataset preset requests a longer window for another architecture.
+if [[ "$cfg_model" == "tff" ]]; then
+    model_seq_len=$(yaml_get_model_arg "$MODEL_CONFIG" "sequence_length")
+    model_img_size=$(yaml_get_model_arg "$MODEL_CONFIG" "img_size")
 fi
 
 # ============================================================
@@ -540,6 +551,22 @@ if [[ "$cfg_data_type" == "fc_graph" || "$cfg_data_type" == "fc_bnt" || "$cfg_da
     fc_channels=$(yaml_get_model_arg "$MODEL_CONFIG" "fc_channels")
     [[ -n "$fc_channels" ]] && CMD+=" --fc_channels $(list_to_args "$fc_channels")"
 fi
+
+if [[ "$cfg_data_type" == "roi" ]]; then
+    CMD+=" --data_type roi --atlas_name ${cfg_atlas_name:-cc200}"
+    roi_seq_len=$(yaml_get_model_arg "$MODEL_CONFIG" "sequence_length")
+    [[ -n "$roi_seq_len" ]] && CMD+=" --sequence_length $roi_seq_len"
+fi
+
+for arg in brainjepa_window_length brainjepa_gradient_checkpointing \
+           band_base_channels band_transformer_layers band_num_heads \
+           band_feedforward_dim band_dropout band_frame_chunk_size band_max_sequence_length \
+           brainlm_num_rois brainlm_image_size brainlm_patch_size brainlm_hidden_size \
+           brainlm_num_layers brainlm_num_heads brainlm_intermediate_size brainlm_dropout brainlm_readout \
+           tff_hidden_size tff_num_layers tff_num_heads tff_intermediate_size tff_max_sequence_length; do
+    value=$(yaml_get_model_arg "$MODEL_CONFIG" "$arg")
+    [[ -n "$value" ]] && CMD+=" --$arg $value"
+done
 
 # Optimizer override
 if [[ -n "$cfg_optimizer" && "$cfg_optimizer" != "AdamW" ]]; then

@@ -1,0 +1,16 @@
+model: tff
+data_type: voxel
+optimizer: AdamW
+learning_rate: 0.0001
+max_epochs: 100
+batch_size: 2
+
+model_args:
+  sequence_length: 20
+  img_size: [75, 80, 81, 20]
+  tff_hidden_size: 2640
+  tff_num_layers: 2
+  tff_num_heads: 16
+  tff_intermediate_size: 3072
+  tff_max_sequence_length: 29
+

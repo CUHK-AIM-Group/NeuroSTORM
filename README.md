@@ -24,7 +24,7 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 - Trainer for pre-training, including the MAE-based mechanism proposed in NeuroSTORM and the contrastive learning approach in SwiFT.
 - Trainer for fine-tuning, including both fully learnable parameters and Task-specific Prompt Learning as proposed in NeuroSTORM.
 - A comprehensive fMRI benchmark, including five tasks: Age and Gender Prediction, Phenotype Prediction, Disease Diagnosis, fMRI Retrieval, and Task fMRI State Classification.
-- Implementations of NeuroSTORM, SwiFT, BrainGNN, BrainNetworkTransformer (BNT), LG-GNN, Com-BrainTF, IBGNN, BrainNetCNN, and other commonly used fMRI analysis models.
+- Implementations of NeuroSTORM, SwiFT, BrainGNN, BrainNetworkTransformer (BNT), LG-GNN, Com-BrainTF, IBGNN, BrainNetCNN, Brain-JEPA, BAnD, and other commonly used fMRI analysis models.
 - Customization options for all stages. You can quickly add custom preprocessing procedures, pre-training methods, fine-tuning strategies, new downstream tasks, and implement other models on the platform.
 
 We welcome community contributions! Feel free to submit a PR to add support for your model or dataset.

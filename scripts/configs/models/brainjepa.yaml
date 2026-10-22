@@ -1,0 +1,12 @@
+model: brainjepa
+data_type: roi
+atlas_name: brainjepa450
+optimizer: AdamW
+learning_rate: 0.0001
+max_epochs: 100
+batch_size: 2
+
+model_args:
+  sequence_length: 160
+  brainjepa_window_length: 480
+  brainjepa_gradient_checkpointing: true

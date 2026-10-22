@@ -73,6 +73,72 @@ def load_model(model_name, hparams=None):
             drop_path_rate=hparams.attn_drop_rate,
             attn_drop_rate=hparams.attn_drop_rate
         )
+    elif model_name in ("brainjepa", "band", "brainlm", "tff"):
+        if getattr(hparams, 'pretraining', False):
+            raise ValueError(f"{model_name} supports supervised training, finetuning and testing; not NeuroSTORM MAE/contrastive pretraining")
+        task_type = getattr(hparams, 'downstream_task_type', 'classification')
+        if task_type not in ('classification', 'regression'):
+            raise ValueError(f"{model_name} requires classification or regression")
+        num_classes = getattr(hparams, 'num_classes', 2)
+        if task_type == 'classification' and num_classes < 2:
+            raise ValueError("Classification requires num_classes >= 2")
+        # Match the framework's binary BCE and scalar regression interfaces.
+        num_outputs = 1 if task_type == 'regression' or num_classes == 2 else num_classes
+        data_type = 'roi' if model_name in ('brainjepa', 'brainlm') else 'voxel'
+        if getattr(hparams, 'data_type', data_type) != data_type:
+            raise ValueError(f"{model_name} requires --data_type {data_type}")
+        restoring = (getattr(hparams, 'resume_ckpt_path', None)
+                     or getattr(hparams, 'test_ckpt_path', None)
+                     or getattr(hparams, 'load_model_path', None))
+        if model_name == 'brainjepa':
+            from .brainjepa import BrainJEPA
+            net = BrainJEPA(
+                checkpoint_path=None if restoring else getattr(hparams, 'brainjepa_checkpoint_path', None),
+                gradient_checkpointing=getattr(hparams, 'brainjepa_gradient_checkpointing', True),
+                gradient_path=getattr(hparams, 'brainjepa_gradient_path', None),
+                num_outputs=num_outputs,
+            )
+        elif model_name == 'brainlm':
+            from .brainlm import BrainLM
+            net = BrainLM(
+                num_outputs=num_outputs,
+                num_rois=getattr(hparams, 'brainlm_num_rois', 424),
+                sequence_length=getattr(hparams, 'sequence_length', 200),
+                image_size=getattr(hparams, 'brainlm_image_size', 432),
+                patch_size=getattr(hparams, 'brainlm_patch_size', 16),
+                hidden_size=getattr(hparams, 'brainlm_hidden_size', 768),
+                num_hidden_layers=getattr(hparams, 'brainlm_num_layers', 12),
+                num_attention_heads=getattr(hparams, 'brainlm_num_heads', 12),
+                intermediate_size=getattr(hparams, 'brainlm_intermediate_size', 3072),
+                dropout=getattr(hparams, 'brainlm_dropout', 0.1),
+                readout=getattr(hparams, 'brainlm_readout', 'cls'),
+                checkpoint_path=None if restoring else getattr(hparams, 'brainlm_checkpoint_path', None),
+            )
+        elif model_name == 'tff':
+            from .tff import TFF
+            net = TFF(
+                num_outputs=num_outputs,
+                spatial_shape=tuple(getattr(hparams, 'img_size', (75, 80, 81, 20))[:3]),
+                hidden_size=getattr(hparams, 'tff_hidden_size', 2640),
+                num_hidden_layers=getattr(hparams, 'tff_num_layers', 2),
+                num_attention_heads=getattr(hparams, 'tff_num_heads', 16),
+                intermediate_size=getattr(hparams, 'tff_intermediate_size', 3072),
+                max_sequence_length=getattr(hparams, 'tff_max_sequence_length', 29),
+                checkpoint_path=None if restoring else getattr(hparams, 'tff_checkpoint_path', None),
+            )
+        else:
+            from .band import BAnD
+            net = BAnD(
+                in_channels=getattr(hparams, 'in_chans', 1),
+                num_classes=num_outputs,
+                base_channels=getattr(hparams, 'band_base_channels', 64),
+                transformer_layers=getattr(hparams, 'band_transformer_layers', 2),
+                num_heads=getattr(hparams, 'band_num_heads', 8),
+                feedforward_dim=getattr(hparams, 'band_feedforward_dim', 2048),
+                dropout=getattr(hparams, 'band_dropout', 0.2),
+                frame_chunk_size=getattr(hparams, 'band_frame_chunk_size', 4),
+                max_sequence_length=getattr(hparams, 'band_max_sequence_length', 40),
+            )
     elif model_name == "braingnn":
         # BrainGNN for graph-based fMRI analysis
         num_rois = getattr(hparams, 'num_rois', 200)

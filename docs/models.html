@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroSTORM | Supported Models</title>
+    <meta
+      name="description"
+      content="NeuroSTORM supports 12 models through a shared supervised training, fine-tuning, validation, and testing workflow."
+    />
+    <meta property="og:title" content="NeuroSTORM - Models" />
+    <meta
+      property="og:description"
+      content="Explore the 12 supported models, their input representations, and unified training commands."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://img.picui.cn/free/2025/06/10/6848379069d65.png" />
+    <meta name="theme-color" content="#1e90ff" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="static/images/icon.png">
+    <style>
+      :root {
+        --primary: #1e90ff;
+        --primary-dark: #1873d9;
+        --secondary: #ff6600;
+        --text: #2c3e50;
+        --text-light: #5a6c7d;
+        --bg: #ffffff;
+        --bg-light: #f8fbfc;
+        --border: #e0e6ed;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 2rem;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        font-weight: 700;
+        color: var(--text);
+        font-size: 1.25rem;
+      }
+
+      .brand img {
+        height: 2rem;
+      }
+
+      nav {
+        display: flex;
+        gap: 2rem;
+      }
+
+      nav a {
+        color: var(--text-light);
+        text-decoration: none;
+        transition: color 0.2s;
+        font-size: 0.95rem;
+      }
+
+      nav a:hover, nav a.active {
+        color: var(--primary);
+      }
+
+      .topbar-actions {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 0.375rem;
+        text-decoration: none;
+        font-size: 0.875rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        display: inline-block;
+      }
+
+      .btn {
+        background: var(--primary);
+        color: white;
+      }
+
+      .btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-2px);
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border);
+      }
+
+      .btn.ghost:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        background: rgba(30, 144, 255, 0.05);
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h2 {
+        font-size: 1.75rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+
+      h3 {
+        font-size: 1.1rem;
+        color: var(--primary);
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .lead {
+        font-size: 1.1rem;
+        color: var(--text-light);
+        margin-bottom: 2rem;
+        max-width: 800px;
+      }
+
+      .table-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      .table-scroll table {
+        min-width: 650px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1.5rem 0;
+        border: 1px solid var(--border);
+        font-size: 0.95rem;
+      }
+
+      table thead {
+        background: var(--bg-light);
+      }
+
+      table th {
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--primary);
+        border-bottom: 2px solid var(--primary);
+      }
+
+      table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      table tr:hover {
+        background: var(--bg-light);
+      }
+
+      details {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+        background: var(--bg-light);
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--primary);
+        padding: 0.5rem 0;
+      }
+
+      summary:hover {
+        color: var(--primary-dark);
+      }
+
+      details[open] summary {
+        color: var(--primary-dark);
+        margin-bottom: 1rem;
+      }
+
+      details p {
+        margin: 0.75rem 0;
+        line-height: 1.7;
+      }
+
+      a {
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-light);
+        font-size: 0.875rem;
+        margin-top: 3rem;
+      }
+
+      @media (max-width: 768px) {
+        h1 {
+          font-size: 1.75rem;
+        }
+        nav {
+          display: none;
+        }
+        table {
+          font-size: 0.85rem;
+        }
+        table th, table td {
+          padding: 0.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="NeuroSTORM Home">
+        <img src="static/images/icon.png" alt="NeuroSTORM logo" />
+        <span>NeuroSTORM</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="index.html">Home</a>
+        <a href="models.html" class="active" aria-current="page">Models</a>
+        <a href="datasets.html">Datasets</a>
+        <a href="tasks.html">Tasks</a>
+        <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM" target="_blank">GitHub</a>
+      </nav>
+      <div class="topbar-actions">
+        <a class="btn ghost" href="mailto:chengwang@link.cuhk.edu.hk">Contact Us</a>
+      </div>
+    </header>
+
+    <main id="models">
+      <h1>Supported Models</h1>
+      <p class="lead">
+        All <strong>12 models</strong> share the supervised training, fine-tuning,
+        validation, testing, and checkpoint workflow through the common runner.
+      </p>
+      <p>Choose the model's input representation and use its <code>--model</code> value with the shared experiment runner.</p>
+      <div class="table-scroll">
+          <table id="model-support">
+            <thead><tr><th>Model</th><th>Input</th><th>Entry point</th></tr></thead>
+            <tbody>
+              <tr><td>NeuroSTORM</td><td>Voxel sequences</td><td><code>--model neurostorm</code></td></tr>
+              <tr><td>SwiFT</td><td>Voxel sequences</td><td><code>--model swift</code></td></tr>
+              <tr><td>BAnD</td><td>Voxel sequences</td><td><code>--model band</code></td></tr>
+              <tr><td>Brain-JEPA</td><td>Ordered 450-ROI time series</td><td><code>--model brainjepa</code></td></tr>
+              <tr><td>BrainGNN</td><td>FC-derived graphs</td><td><code>--model braingnn</code></td></tr>
+              <tr><td>LG-GNN</td><td>FC-derived graphs</td><td><code>--model lggnn</code></td></tr>
+              <tr><td>IBGNN</td><td>FC-derived graphs</td><td><code>--model ibgnn</code></td></tr>
+              <tr><td>BNT</td><td>FC matrices</td><td><code>--model bnt</code></td></tr>
+              <tr><td>Com-BrainTF</td><td>FC matrices</td><td><code>--model combraintf</code></td></tr>
+              <tr><td>BrainNetCNN</td><td>FC matrices</td><td><code>--model brainnetcnn</code></td></tr>
+              <tr><td>BrainLM</td><td>Ordered ROI time series</td><td><code>--model brainlm</code></td></tr>
+              <tr><td>TFF</td><td>Voxel sequences</td><td><code>--model tff</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      <p>
+          Brain-JEPA requires ROI signals in the same 450-region order as its
+          gradient table. NeuroSTORM MAE and SwiFT contrastive learning have
+          model-specific pretraining configurations. The dedicated Task4 evaluator
+          covers NeuroSTORM, SwiFT, BrainLM, TFF, BNT, Com-BrainTF, LG-GNN, and BrainGNN.
+          See the <a href="https://github.com/CUHK-AIM-Group/NeuroSTORM/blob/main/scripts/README.md#available-models">model configuration reference</a>
+          and <a href="datasets.html#dataset-support">dataset support table</a> to select inputs and tasks.
+        </p>
+    </main>
+
+    <footer>
+      <p>
+        NeuroSTORM © 2025 ·
+        <a href="http://www.ee.cuhk.edu.hk/~yxyuan/" target="_blank" rel="noreferrer">CUHK-AIM-Group</a>
+      </p>
+    </footer>
+  </body>
+</html>

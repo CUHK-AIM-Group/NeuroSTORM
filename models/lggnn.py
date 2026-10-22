@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_mean_pool, global_max_pool
-from torch_geometric.utils import dense_to_sparse, add_self_loops
+from torch_geometric.utils import dense_to_sparse, add_self_loops, add_remaining_self_loops
 
 
 class GraphLearningLayer(nn.Module):
@@ -20,7 +20,7 @@ class GraphLearningLayer(nn.Module):
     Computes similarity-based adjacency matrix.
     """
 
-    def __init__(self, input_dim, hidden_dim=64, k=10, metric='cosine'):
+    def __init__(self, input_dim, hidden_dim=64, k=10, metric='cosine', edge_normalization='legacy_batch'):
         """
         Args:
             input_dim: Input feature dimension
@@ -31,6 +31,7 @@ class GraphLearningLayer(nn.Module):
         super().__init__()
         self.k = k
         self.metric = metric
+        self.edge_normalization = edge_normalization
 
         if metric == 'attention':
             self.query = nn.Linear(input_dim, hidden_dim)
@@ -69,6 +70,15 @@ class GraphLearningLayer(nn.Module):
         else:
             raise ValueError(f"Unknown metric: {self.metric}")
 
+        if self.edge_normalization == 'per_node':
+            values, neighbors = similarity.topk(min(self.k, num_nodes), dim=-1)
+            offsets = torch.arange(batch_size, device=x.device)[:, None, None] * num_nodes
+            source = torch.arange(num_nodes, device=x.device)[None, :, None].expand_as(neighbors)
+            edges = torch.stack([(source + offsets).flatten(), (neighbors + offsets).flatten()])
+            return edges, values.softmax(dim=-1).flatten()
+        if self.edge_normalization != 'legacy_batch':
+            raise ValueError(self.edge_normalization)
+
         # Keep top-k neighbors for each node
         if self.k < num_nodes:
             # Get top-k values and indices
@@ -103,13 +113,14 @@ class LGGNNLayer(nn.Module):
     """
 
     def __init__(self, input_dim, output_dim, hidden_dim=64, k=10,
-                 learn_graph=True, dropout=0.5):
+                 learn_graph=True, dropout=0.5, graph_metric='cosine', edge_normalization='legacy_batch'):
         super().__init__()
 
         self.learn_graph = learn_graph
+        self.edge_normalization = edge_normalization
 
         if learn_graph:
-            self.graph_learner = GraphLearningLayer(input_dim, hidden_dim, k)
+            self.graph_learner = GraphLearningLayer(input_dim, hidden_dim, k, graph_metric, edge_normalization)
 
         self.gcn = GCNConv(input_dim, output_dim)
         self.bn = nn.BatchNorm1d(output_dim)
@@ -142,7 +153,8 @@ class LGGNNLayer(nn.Module):
             x_flat = x if x.dim() == 2 else x.view(-1, x.size(-1))
 
         # Add self-loops
-        edge_index, edge_weight = add_self_loops(edge_index, edge_weight, num_nodes=x_flat.size(0))
+        add_loops = add_remaining_self_loops if self.edge_normalization == 'per_node' else add_self_loops
+        edge_index, edge_weight = add_loops(edge_index, edge_weight, num_nodes=x_flat.size(0))
 
         # GCN convolution
         x_out = self.gcn(x_flat, edge_index, edge_weight)
@@ -174,6 +186,7 @@ class LGGNN(nn.Module):
         learn_graph=True,
         graph_metric='cosine',
         dropout=0.5,
+        edge_normalization='legacy_batch',
         **kwargs
     ):
         """
@@ -204,6 +217,8 @@ class LGGNN(nn.Module):
                     hidden_dim=64,
                     k=k_neighbors,
                     learn_graph=(learn_graph and i == 0),  # Only learn graph in first layer
+                    graph_metric=graph_metric,
+                    edge_normalization=edge_normalization,
                     dropout=dropout
                 )
             )

@@ -338,6 +338,14 @@ class fMRIDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        model = getattr(self.hparams, 'model', None)
+        if model in ('brainjepa', 'band', 'brainlm', 'tff'):
+            expected = 'roi' if model in ('brainjepa', 'brainlm') else 'voxel'
+            if getattr(self.hparams, 'data_type', 'voxel') != expected:
+                raise ValueError(f"{model} requires --data_type {expected}")
+            if self.hparams.pretraining:
+                raise ValueError(f"{model} does not use the NeuroSTORM pretraining objective")
+
         self.dataset_names, self.image_paths = self._parse_dataset_specs()
         if len(self.dataset_names) > 1 and not self.hparams.pretraining:
             raise ValueError(
@@ -533,12 +541,21 @@ class fMRIDataModule(pl.LightningDataModule):
                 self.hparams.dataset_name = prev_name
                 self.hparams.image_path = prev_path
 
+    def _input_subject_names(self):
+        if getattr(self.hparams, 'model', None) in ('brainjepa', 'brainlm'):
+            atlas = self.hparams.atlas_name
+            suffix = f"_{atlas}.npy"
+            roi_root = os.path.join(self.hparams.image_path, 'roi', atlas)
+            return sorted(name[:-len(suffix)] for name in os.listdir(roi_root)
+                          if name.endswith(suffix))
+        return os.listdir(os.path.join(self.hparams.image_path, 'img'))
+
     def _make_subject_dict_with_labels(self):
         img_root = os.path.join(self.hparams.image_path, 'img')
         final_dict = dict()
 
         if self.hparams.dataset_name == "HCP1200":
-            subject_list = os.listdir(img_root)
+            subject_list = self._input_subject_names()
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_gender.csv"))
             meta_data_residual = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "HCP_1200_precise_age.csv"))
             if self.hparams.task_name == 'sex':
@@ -611,7 +628,7 @@ class fMRIDataModule(pl.LightningDataModule):
             
         elif self.hparams.dataset_name in ("HCPA", "HCPD"):
             csv_name = "hcpa-rest.csv" if self.hparams.dataset_name == "HCPA" else "hcpd-rest.csv"
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
 
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", csv_name))
             if self.hparams.task_name == 'sex':
@@ -640,7 +657,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print(f'Load dataset {self.hparams.dataset_name}, {len(final_dict)} subjects')
 
         elif self.hparams.dataset_name == "ABCD":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "abcd-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'sex'
@@ -667,7 +684,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset ABCD, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "Cobre":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "cobre-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'sex'
@@ -700,7 +717,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset Cobre, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "ADHD200":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "adhd200-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'Gender'
@@ -729,7 +746,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset ADHD200, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "UCLA":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "ucla-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'gender'
@@ -762,7 +779,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset UCLA, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "HCPEP":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "hcpep-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'sex'
@@ -793,7 +810,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset HCPEP, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "GOD":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "god_label.csv"))
             if self.hparams.downstream_task_id == 4: task_name = 'class'
@@ -830,7 +847,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset GOD, {} subjects, {} classes'.format(len(final_dict), len(unique_categories)))
 
         elif self.hparams.dataset_name == "UKB":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
 
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "ukb-rest.csv"))
             if self.hparams.task_name == 'sex': task_name = 'sex'
@@ -855,7 +872,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset UKB, {} subjects'.format(len(final_dict)))
         
         elif self.hparams.dataset_name == "HCPTASK":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
 
             if self.hparams.downstream_task_id == 5: task_name = 'classification'
             else: raise ValueError('downstream task not supported')
@@ -872,7 +889,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset HCPTASK, {} subjects'.format(len(final_dict)))
 
         elif self.hparams.dataset_name == "MOVIE":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
             parent_dir = os.path.dirname(os.path.abspath(img_root))
             metadata_dir = os.path.join(parent_dir, 'metadata')
             participants_file = os.path.join(metadata_dir, 'participants.tsv')
@@ -899,7 +916,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset MOVIE, {} subjects'.format(len(final_dict)))
 
         elif self.hparams.dataset_name == "ABIDE":
-            subject_list = [subj for subj in os.listdir(img_root)]
+            subject_list = self._input_subject_names()
 
             meta_data = pd.read_csv(os.path.join(self.hparams.image_path, "metadata", "phenotypic.csv"))
 
@@ -941,7 +958,7 @@ class fMRIDataModule(pl.LightningDataModule):
             print('Load dataset ABIDE, {} subjects'.format(len(final_dict)))
 
         if self.hparams.dataset_name == "TransDiag":
-            subject_list = os.listdir(img_root)
+            subject_list = self._input_subject_names()
 
             # diagnosis, clinical_variables
             if self.hparams.task_name == 'diagnosis': 
@@ -1043,6 +1060,15 @@ class fMRIDataModule(pl.LightningDataModule):
                     "atlas_name": getattr(self.hparams, 'atlas_name', 'cc200'),
                     "sequence_length": getattr(self.hparams, 'sequence_length', None),
                     "stride": getattr(self.hparams, 'stride_within_seq', 1)}
+            if getattr(self.hparams, 'model', None) == 'brainjepa':
+                from .brainjepa_dataset import BrainJEPADataset
+                Dataset = BrainJEPADataset
+                params['window_length'] = getattr(self.hparams, 'brainjepa_window_length', 480)
+            elif getattr(self.hparams, 'model', None) == 'brainlm':
+                from .brainlm_dataset import BrainLMDataset
+                Dataset = BrainLMDataset
+                params['num_rois'] = getattr(self.hparams, 'brainlm_num_rois', 424)
+                params['stats_path'] = getattr(self.hparams, 'brainlm_stats_path', None)
         elif data_type == 'fc':
             Dataset = FCDataset
             params = {
@@ -1152,7 +1178,7 @@ class fMRIDataModule(pl.LightningDataModule):
             params = {
                 "batch_size": self.hparams.batch_size if train else self.hparams.eval_batch_size,
                 "num_workers": self.hparams.num_workers,
-                "drop_last": True,
+                "drop_last": train if getattr(self.hparams, 'model', None) in ('brainjepa', 'band', 'brainlm', 'tff') else True,
                 "pin_memory": bool(self.hparams.pin_memory),
                 "persistent_workers": (self.hparams.num_workers > 0) and (train and (self.hparams.strategy == 'ddp')),
                 "shuffle": train,

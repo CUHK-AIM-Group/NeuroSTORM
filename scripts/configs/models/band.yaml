@@ -1,0 +1,17 @@
+model: band
+data_type: voxel
+optimizer: AdamW
+learning_rate: 0.0001
+max_epochs: 100
+batch_size: 2
+
+model_args:
+  sequence_length: 40
+  img_size: [96, 96, 96, 40]
+  band_base_channels: 64
+  band_transformer_layers: 2
+  band_num_heads: 8
+  band_feedforward_dim: 2048
+  band_dropout: 0.2
+  band_frame_chunk_size: 4
+  band_max_sequence_length: 40
