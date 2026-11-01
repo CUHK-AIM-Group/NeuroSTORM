@@ -1,0 +1,343 @@
+{
+  "task": "DMT-HAR-MED",
+  "input": "paired_pre_post_first40",
+  "seeds": [
+    1234,
+    1235,
+    1236,
+    1237,
+    1238
+  ],
+  "subjects": [
+    {
+      "person": "sub-15",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-15_ses-01",
+      "post": "sub-15_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-20",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-20_ses-01",
+      "post": "sub-20_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-04",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-04_ses-01",
+      "post": "sub-04_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-06",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-06_ses-01",
+      "post": "sub-06_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-27",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-27_ses-01",
+      "post": "sub-27_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-38",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-38_ses-01",
+      "post": "sub-38_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-10",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-10_ses-01",
+      "post": "sub-10_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-07",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-07_ses-01",
+      "post": "sub-07_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-24",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-24_ses-01",
+      "post": "sub-24_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-13",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-13_ses-01",
+      "post": "sub-13_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-26",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-26_ses-01",
+      "post": "sub-26_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-30",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-30_ses-01",
+      "post": "sub-30_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-23",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-23_ses-01",
+      "post": "sub-23_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-40",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-40_ses-01",
+      "post": "sub-40_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-37",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-37_ses-01",
+      "post": "sub-37_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-17",
+      "split": "Train",
+      "label": 0,
+      "pre": "sub-17_ses-01",
+      "post": "sub-17_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-29",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-29_ses-01",
+      "post": "sub-29_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-08",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-08_ses-01",
+      "post": "sub-08_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-28",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-28_ses-01",
+      "post": "sub-28_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-36",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-36_ses-01",
+      "post": "sub-36_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-16",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-16_ses-01",
+      "post": "sub-16_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-21",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-21_ses-01",
+      "post": "sub-21_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-09",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-09_ses-01",
+      "post": "sub-09_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-03",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-03_ses-01",
+      "post": "sub-03_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-39",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-39_ses-01",
+      "post": "sub-39_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-18",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-18_ses-01",
+      "post": "sub-18_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-34",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-34_ses-01",
+      "post": "sub-34_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-19",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-19_ses-01",
+      "post": "sub-19_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-25",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-25_ses-01",
+      "post": "sub-25_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-05",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-05_ses-01",
+      "post": "sub-05_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-31",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-31_ses-01",
+      "post": "sub-31_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-35",
+      "split": "Train",
+      "label": 1,
+      "pre": "sub-35_ses-01",
+      "post": "sub-35_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-33",
+      "split": "Val",
+      "label": 1,
+      "pre": "sub-33_ses-01",
+      "post": "sub-33_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-12",
+      "split": "Val",
+      "label": 1,
+      "pre": "sub-12_ses-01",
+      "post": "sub-12_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-01",
+      "split": "Val",
+      "label": 0,
+      "pre": "sub-01_ses-01",
+      "post": "sub-01_ses-02",
+      "sex": "f"
+    },
+    {
+      "person": "sub-32",
+      "split": "Val",
+      "label": 0,
+      "pre": "sub-32_ses-01",
+      "post": "sub-32_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-02",
+      "split": "Test",
+      "label": 0,
+      "pre": "sub-02_ses-01",
+      "post": "sub-02_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-14",
+      "split": "Test",
+      "label": 0,
+      "pre": "sub-14_ses-01",
+      "post": "sub-14_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-11",
+      "split": "Test",
+      "label": 1,
+      "pre": "sub-11_ses-01",
+      "post": "sub-11_ses-02",
+      "sex": "m"
+    },
+    {
+      "person": "sub-22",
+      "split": "Test",
+      "label": 1,
+      "pre": "sub-22_ses-01",
+      "post": "sub-22_ses-02",
+      "sex": "m"
+    }
+  ],
+  "test_order": [
+    "sub-02",
+    "sub-14",
+    "sub-11",
+    "sub-22"
+  ],
+  "class_names": [
+    "Placebo",
+    "DMT-harmine"
+  ]
+}

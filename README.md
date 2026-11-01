@@ -53,7 +53,7 @@ conda create -n neurostorm python=3.11
 conda activate neurostorm
 
 # Set environment variables (auto-detects paths)
-source ./set_env.sh
+source ./env.sh
 
 # Install dependencies
 pip install -r requirements.txt
@@ -244,7 +244,8 @@ Key repository paths are:
 │ 
 ├── main.py                            <- training entry point
 ├── demo.py                            <- unified inference (single file & dataset)
-├── set_env.sh                         <- environment variable setup
+├── env.sh                             <- shared project environment setup
+├── set_env.sh                         <- compatibility entry point for env.sh
 ├── Dockerfile                         <- Docker image configuration
 ├── Makefile                           <- test and dev commands
 ├── requirements.txt                   <- Python dependencies

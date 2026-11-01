@@ -17,9 +17,8 @@ def evaluate(vectors, subjects, scans, protocol, split="test"):
     if len(lookup) != len(x) or len(subjects) != len(x):
         raise ValueError("Scan IDs must be unique and aligned with embeddings")
     trials, events = [], []
-    allowed = set(protocol["fixed400_query_scans"])
     for trial in protocol[split]:
-        queries = [s for s in trial["query_scans"] if split != "test" or s in allowed]
+        queries = trial["query_scans"]
         gallery = trial["gallery_scans"]
         if not queries or len(set(gallery)) != len(gallery) or set(queries) & set(gallery):
             raise ValueError("Invalid or overlapping query/gallery lists")

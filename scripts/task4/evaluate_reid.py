@@ -4,9 +4,12 @@ import argparse
 import json
 from pathlib import Path
 import sys
-import time
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tqdm import tqdm
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "demo"))
 
 
 def write_ranking_list(path, events):
@@ -32,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-dir", type=Path, required=True)
     parser.add_argument("--models", nargs="+", default=["all"])
-    parser.add_argument("--data-config", type=Path, default=Path(__file__).resolve().parents[1] / "configs/reid/hcpya.yaml")
+    parser.add_argument("--data-config", type=Path, default=ROOT / "demo/task4_config.yaml")
     parser.add_argument("--split", choices=("valid", "test"), default="test")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -56,9 +59,12 @@ def main():
         from tasks.reid.data import load_config, read_json, scan_ids
         from tasks.reid.features import extract
         from tasks.reid.metrics import evaluate, normalize
+        from task4 import QueryProgress
 
         config = load_config(args.data_config)
         protocol = read_json(config["protocol"])
+        if args.split not in protocol:
+            parser.error(f"The selected protocol has no {args.split!r} split")
         scans = scan_ids(config, args.split, protocol)
         if not scans:
             raise ValueError('No scans are configured for this split')
@@ -77,18 +83,18 @@ def main():
         if args.check_only:
             print(f"{name}: checkpoint loaded successfully", flush=True)
         else:
-            last_print = [0.]
+            query_progress = QueryProgress(scans, protocol, args.split)
+            with tqdm(total=query_progress.total, desc=name, file=sys.stdout, ascii=False,
+                      bar_format="{desc}: {percentage:6.2f}%|{bar}|",
+                      dynamic_ncols=True, mininterval=0.2, miniters=1) as bar:
+                def progress(done, total, **extra):
+                    bar.update(query_progress.update(done, total, **extra))
 
-            def progress(done, total, **extra):
-                if done == total or time.monotonic() - last_print[0] > 30:
-                    print(f"{name}: {done / total:.1%}", flush=True)
-                    last_print[0] = time.monotonic()
-
-            vectors, _ = extract(network, hp, config, scans, progress)
+                vectors, _ = extract(network, hp, config, scans, progress)
             vectors = normalize(vectors)
             metrics, _, events = evaluate(vectors, subjects, scans, protocol, args.split)
             write_ranking_list(args.output_dir / (name + ".txt"), events)
-            print(f"{name}: Top-1 {metrics['top1'] * 100:.6f}%, mAP {metrics['mAP'] * 100:.6f}%", flush=True)
+            print(f"{name}: Top-1 {metrics['top1'] * 100:.2f}%, mAP {metrics['mAP'] * 100:.2f}%", flush=True)
         del network
         torch.cuda.empty_cache()
 

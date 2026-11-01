@@ -1,12 +1,41 @@
 """The frozen feature and scan-aggregation paths for submitted weights."""
 from concurrent.futures import ProcessPoolExecutor
 from collections import deque
+from functools import partial
 import multiprocessing
+from pathlib import Path
+import shutil
+import h5py
 import numpy as np
 import torch
 import torch.nn.functional as F
 from .data import image_path, read_image, read_fc
 from .metrics import normalize
+
+
+def _read_shared_image(path, buffered=False):
+    """Send a shared tensor handle instead of pickling an entire scan volume."""
+    raw, scale = read_image(path, buffered=buffered)
+    return torch.from_numpy(raw).share_memory_(), scale
+
+
+def _image_reader(config, scans, workers):
+    # Each compressed scan expands to about 0.9 GB. Bound shared-memory use by
+    # the existing read queue, with room for the current scan and one spare.
+    buffered = bool(config.get("image_buffered_read", True))
+    reader = partial(read_image, buffered=buffered)
+    if not scans or not config.get("image_shared_memory", True) or not Path("/dev/shm").is_dir():
+        return reader
+    with h5py.File(image_path(config, scans[0]), "r") as handle:
+        frames = handle["frames"]
+        size = int(np.prod(frames.shape)) * frames.dtype.itemsize
+    return (partial(_read_shared_image, buffered=buffered)
+            if shutil.disk_usage("/dev/shm").free >= (workers + 2) * size else reader)
+
+
+def _init_image_worker():
+    # Each reader decodes one volume, without an extra Torch thread pool.
+    torch.set_num_threads(1)
 
 
 @torch.no_grad()
@@ -22,13 +51,15 @@ def extract_native(network, hp, config, scans, progress):
     workers = int(config.get('image_read_workers', 4))
     if workers < 1:
         raise ValueError('image_read_workers must be positive')
-    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('spawn')) as executor:
-        pending = deque(executor.submit(read_image, image_path(config, scan)) for scan in scans[:workers])
+    reader = _image_reader(config, scans, workers)
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('spawn'),
+                             initializer=_init_image_worker) as executor:
+        pending = deque(executor.submit(reader, image_path(config, scan)) for scan in scans[:workers])
         for i, scan_id in enumerate(scans):
             raw, scale = pending.popleft().result()
             if i + workers < len(scans):
-                pending.append(executor.submit(read_image, image_path(config, scans[i + workers])))
-            scan = torch.from_numpy(raw).to(device).float().mul_(scale)
+                pending.append(executor.submit(reader, image_path(config, scans[i + workers])))
+            scan = torch.as_tensor(raw).to(device).float().mul_(scale)
             starts = list(range(0, len(scan) - duration + 1, stride))
             if not starts:
                 raise ValueError("Scan is shorter than the model window: " + scan_id)
@@ -94,6 +125,8 @@ def extract(network, hp, config, scans, progress):
             x = (x - stats["median"][:, None]) / stats["iqr"][:, None]
             recordings.append(torch.tensor(x[stats["roi_order"]] / np.float32(5.6430855)))
         requests = [(i, start) for i, x in enumerate(recordings) for start in range(0, x.shape[1] - 199, 200)]
+        # A BrainLM query is complete only after all its windows, not one window.
+        window_ends = np.cumsum([max((x.shape[1] - 200) // 200 + 1, 0) for x in recordings])
         sums = torch.zeros(len(scans), 768)
         counts = torch.zeros(len(scans))
         torch.manual_seed(1234)
@@ -106,7 +139,8 @@ def extract(network, hp, config, scans, progress):
             for (i, _), value in zip(batch, z.cpu()):
                 sums[i] += value
                 counts[i] += 1
-            progress(offset + len(batch), len(requests), unit="windows")
+            completed = int(np.searchsorted(window_ends, offset + len(batch), side="right"))
+            progress(completed, len(scans), windows=offset + len(batch))
         if not (counts > 0).all():
             raise ValueError("A scan contains no complete BrainLM window")
         # The trained FP64 metric is applied AFTER the FP32 window mean.

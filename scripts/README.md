@@ -205,7 +205,7 @@ python demo.py \
 ### Quick ReID evaluation
 
 The [ReID entry point](task4/evaluate_reid.py) evaluates the eight released checkpoints
-using the saved HCP-YA query/gallery lists. Run the following commands from the
+using the shared [demo query/gallery lists](../demo/task4_protocol.json). Run the following commands from the
 repository root. Install the project environment (including Mamba for NeuroSTORM)
 and the repository dependencies:
 
@@ -229,7 +229,7 @@ Download the eight Task4 `.ckpt` files into a checkpoint directory:
 The evaluation script also accepts the local bundle filenames, such as
 `NeuroSTORM.ckpt`, for existing downloads.
 
-Configure [`scripts/configs/reid/hcpya.yaml`](configs/reid/hcpya.yaml) with the paths
+Configure [`demo/task4_config.yaml`](../demo/task4_config.yaml) with the paths
 to your preprocessed data:
 
 | Configuration key | Input layout |
@@ -238,7 +238,7 @@ to your preprocessed data:
 | `fc_root` | `<subject>/<scan>.npy`; CC200 correlation matrices of shape `[190,190]` |
 | `roi_root` | `<subject>/<scan>.npy`; A424 time series of shape `[424,T]` |
 
-Use the same preprocessed scans as the released evaluation split. Paths are
+Use the preprocessed scans listed in the demo protocol. Paths are
 resolved relative to the configuration file. Update the data-root paths and
 leave the remaining configuration unchanged. ReID performance is reported on
 **400 scans** across five saved trials. Each query has one or two relevant
@@ -265,7 +265,7 @@ $$
 ```bash
 python scripts/task4/evaluate_reid.py \
   --checkpoint-dir /path/to/checkpoints/reid \
-  --data-config scripts/configs/reid/hcpya.yaml \
+  --data-config demo/task4_config.yaml \
   --models all --split test --device cuda \
   --output-dir results/reid
 ```
@@ -276,22 +276,19 @@ The entry point reads the input data and performs fresh inference. It prints
 Top-1 and mAP and saves one ranking list per model, such as `BrainGNN.txt`.
 `--check-only` checks strict checkpoint loading without running the data evaluation.
 
-Generate the points view from the Source Data workbook, or the violin view from the ranking lists:
+Generate the two line charts from the Source Data workbook:
 
 ```bash
 python scripts/task4/plot_fig5.py \
-  --mode points --source /path/to/41551_2026_1666_MOESM6_ESM.xlsx \
-  --output-dir results/fig5
-
-python scripts/task4/plot_fig5.py \
-  --mode violin \
-  --ranking-dir /path/to/ranking_lists \
+  --source /path/to/41551_2026_1666_MOESM6_ESM.xlsx \
   --output-dir results/fig5
 ```
 
 The [plotting script](task4/plot_fig5.py) reads the five rows in the workbook's `Top1`
-and `map` sheets for points mode. Violin mode computes query scores from the ranking
-lists. The outputs are `Fig5_points.*` and `Fig5_violin.*` in PNG, PDF, and SVG format.
+and `map` sheets directly. Each model's five trial scores are connected by a line.
+The outputs are `Fig5_lineplot.png`, `Fig5_lineplot.pdf`, and `Fig5_lineplot.svg`.
+
+Demonstration videos are available for [Task4](https://drive.google.com/file/d/18vR9N8DOzwJ9imb7xUzVXrsAFZmk3GV0/view?usp=sharing) and [Task5](https://drive.google.com/file/d/1gjTQQu0yxyqNo_TFoW19HgauW-8_NUYU/view?usp=sharing).
 
 ## Configuration Structure
 

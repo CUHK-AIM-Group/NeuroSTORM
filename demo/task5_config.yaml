@@ -1,0 +1,3 @@
+data_root: ../data/task5
+protocol: task5_protocol.json
+atlas: ../datasets/atlas/cc200/atlas.nii.gz

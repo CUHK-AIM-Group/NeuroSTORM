@@ -1,5 +1,6 @@
 """ReID inputs; paths are configured independently of checkpoint metadata."""
 import json
+import io
 from pathlib import Path
 import h5py
 import numpy as np
@@ -39,8 +40,11 @@ def image_path(config, scan):
     return config["image_root"] / subject / sequence / "data.h5"
 
 
-def read_image(path):
-    with h5py.File(path, "r") as handle:
+def read_image(path, buffered=False):
+    # A sequential compressed-file read avoids many seeks over SSHFS. Keep
+    # HDF5's original decoder and bound buffers by the image read worker queue.
+    source = io.BytesIO(Path(path).read_bytes()) if buffered else path
+    with h5py.File(source, "r") as handle:
         raw = handle["frames"][:]
         scale = float(handle.attrs.get("scale", 1.0))
     if raw.ndim != 4 or not np.isfinite(scale) or not np.isfinite(raw).all():

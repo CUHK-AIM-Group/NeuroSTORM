@@ -27,7 +27,7 @@ conda create -n neurostorm python=3.11
 conda activate neurostorm
 
 # 3. Set environment variables (auto-detects paths)
-source ./set_env.sh
+source ./env.sh
 
 # 4. Install dependencies
 pip install -r requirements.txt
@@ -64,17 +64,26 @@ python --version  # Should show Python 3.11.x
 
 ### Step 3: Set Environment Variables
 
-The `set_env.sh` script automatically detects your conda and CUDA paths:
+Source `env.sh` before training, evaluation, inference demos or dependency builds:
 
 ```bash
-source ./set_env.sh
+source ./env.sh
 ```
 
 **What it does:**
-- Auto-detects conda environment path from `$CONDA_PREFIX`
-- Auto-detects CUDA installation (tries `/usr/local/cuda-12.8`, `/usr/local/cuda`, `/opt/cuda`)
-- Sets up GCC-11 for mamba-ssm compilation
-- Configures CUDA architecture for your GPU
+- Uses `NEUROSTORM_ENV` when provided, otherwise a project `.env`/`.venv`,
+  otherwise the already active Conda or virtualenv environment.
+- Sets `NEUROSTORM_ROOT` and adds the project to `PYTHONPATH`.
+- Detects available compiler and CUDA toolkit paths without selecting a fixed
+  CUDA version, compiler version, GPU or GPU architecture.
+- Keeps cache and temporary files under the project by default. Explicit cache,
+  compiler, CUDA and GPU settings are preserved; repeated sourcing does not
+  duplicate search paths.
+- Defaults `NUMPY_MADVISE_HUGEPAGE` to `0` to avoid costly NumPy allocations.
+
+The same script works from any current directory when sourced by its full path.
+It configures an existing environment; install dependencies separately. Older
+commands using `source ./set_env.sh` are forwarded to this same implementation.
 
 **Manual Configuration (if auto-detection fails):**
 

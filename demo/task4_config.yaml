@@ -1,0 +1,10 @@
+# Set these three paths once, or link your existing inputs to data/{img,fc,roi}.
+# Paths are resolved relative to this file, NOT relative to the current shell.
+image_root: ../data/img
+fc_root: ../data/fc
+roi_root: ../data/roi
+
+brainlm_stats: ../scripts/configs/reid/assets/brainlm_stats.npz
+protocol: task4_protocol.json
+image_read_workers: 4
+image_buffered_read: true

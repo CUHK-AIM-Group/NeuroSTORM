@@ -25,6 +25,13 @@ fslinstaller.py
 # ============================================================
 data
 output
+/checkpoints/
+/results/
+/.venv/
+/.env/
+/.compiler/
+/.cache/
+/.tmp/
 datasets/ukb_roi
 datasets/HCP1200_roi
 datasets/HCP1200_roi.zip
@@ -55,3 +62,5 @@ scripts/neurostorm_tpt4_sex_retry.sh
 scripts/dataset_download/extract_2d_slices.py
 scripts/dataset_download/README_2d.md
 patches/
+/test.sh
+/test_dmt.sh

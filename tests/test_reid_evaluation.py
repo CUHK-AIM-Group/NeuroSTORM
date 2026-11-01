@@ -9,8 +9,9 @@ from tasks.reid.data import load_config, read_fc, scan_ids
 
 
 def protocol(trials, allowed):
-    return {"test": [{"trial": i, "seed": 1234 + i, "query_scans": q, "gallery_scans": g}
-                     for i, (q, g) in enumerate(trials)], "fixed400_query_scans": allowed}
+    return {"test": [{"trial": i, "seed": 1234 + i,
+                      "query_scans": [s for s in q if s in allowed], "gallery_scans": g}
+                     for i, (q, g) in enumerate(trials)]}
 
 
 def test_trial_mean_and_ap_from_known_hit_ranks():
@@ -85,10 +86,10 @@ def test_fc_loading_does_not_change_input_file(tmp_path):
 def test_config_paths_resolve_from_config_location(tmp_path):
     import yaml
     path = tmp_path / "config.yaml"
-    path.write_text(yaml.safe_dump({"image_root": "img", "protocol": "fixed400.json"}))
+    path.write_text(yaml.safe_dump({"image_root": "img", "protocol": "protocol.json"}))
     cfg = load_config(path)
     assert cfg["image_root"] == tmp_path / "img"
-    assert cfg["protocol"] == tmp_path / "fixed400.json"
+    assert cfg["protocol"] == tmp_path / "protocol.json"
 
 
 def test_per_node_graph_readout_is_independent_of_batch_members():
