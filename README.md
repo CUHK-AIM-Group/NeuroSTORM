@@ -30,6 +30,8 @@ This platform is proposed in our paper *Towards a General-Purpose Foundation Mod
 We welcome community contributions! Feel free to submit a PR to add support for your model or dataset.
 
 ## 🚀 Updates
+
+* __[2026.11.03]__: We made demos showing how to reproduce the results for [Task 4](https://drive.google.com/file/d/18vR9N8DOzwJ9imb7xUzVXrsAFZmk3GV0/view?usp=drive_link) and [Task 5](https://drive.google.com/file/d/1jlhFyGW4yrg0vk39M6kVSiKyleTcAxmc/view?usp=sharing) of the NeuroSTORM paper. The preprocessed data were generated using the preprocessing tools available in [our GitHub repository](https://github.com/CUHK-AIM-Group/NeuroSTORM/tree/main/datasets). The corresponding illustrations can be found in the [code correspondence guide](https://drive.google.com/file/d/1DyaEEv17M9_50bQQlpxgM-XYDLiX8rSh/view?usp=sharing) and [demo video guide](https://drive.google.com/file/d/11XSeF18jn6bMkvoXlxEqe5AcnZ27CD6m/view?usp=sharing).
 * __[2026.09.19]__: `demo.py` single-subject inference now averages all windows of the whole scan (instead of only the first clip), and regression predictions are automatically inverse-standardized to the original label units (e.g. years for age).
 * __[2026.05.14]__: Added Task-specific Prompt Tuning (`--tpt_strategy prompt --prompt_len 50`) for NeuroSTORM downstream adaptation; switched volume preprocessing to int8 quantization with a single `data.pt` per subject (mmap-based partial reads).
 * __[2026.05.08]__: Added BrainGNN, BNT, LG-GNN, Com-BrainTF, BrainNetCNN and IBGNN support. Framework now supports voxel (4D), ROI (2D), and FC (2D) inputs.
